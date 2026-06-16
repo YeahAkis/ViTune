@@ -237,6 +237,7 @@ class SongBundleAccessor(val extras: Bundle = Bundle()) : BundleAccessor {
     var artistIds by extras.stringList
     var explicit by extras.boolean
     var isFromPersistentQueue by extras.boolean
+    var isFromCustomQueue by extras.boolean
 }
 
 inline val Bundle.songBundle get() = SongBundleAccessor(this)

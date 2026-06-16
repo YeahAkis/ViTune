@@ -2,7 +2,6 @@ package app.vitune.android.ui.screens.player
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -55,6 +54,7 @@ import androidx.compose.ui.layout.LookaheadScope
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.MediaItem
@@ -92,6 +92,10 @@ import app.vitune.android.utils.asMediaItem
 import app.vitune.android.utils.enqueue
 import app.vitune.android.utils.medium
 import app.vitune.android.utils.onFirst
+import app.vitune.android.utils.playAtIndex
+import app.vitune.android.utils.removeCustomQueueItem
+import app.vitune.android.utils.moveCustomQueueItem
+import app.vitune.android.utils.movePlaylistQueueItem
 import app.vitune.android.utils.semiBold
 import app.vitune.android.utils.shouldBePlaying
 import app.vitune.android.utils.shuffleQueue
@@ -100,6 +104,7 @@ import app.vitune.android.utils.windows
 import app.vitune.compose.persist.persist
 import app.vitune.compose.reordering.animateItemPlacement
 import app.vitune.compose.reordering.draggedItem
+import app.vitune.compose.reordering.ReorderingState
 import app.vitune.compose.reordering.rememberReorderingState
 import app.vitune.core.data.enums.PlaylistSortBy
 import app.vitune.core.data.enums.SortOrder
@@ -116,6 +121,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.milliseconds
 
+private const val CUSTOM_QUEUE_KEY = "isFromCustomQueue"
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun Queue(
@@ -131,7 +138,7 @@ fun Queue(
     scrollConnection: NestedScrollConnection = remember(layoutState::preUpPostDownNestedScrollConnection),
     windowInsets: WindowInsets = WindowInsets.systemBars
 ) {
-    val (colorPalette, typography, _, thumbnailShape) = LocalAppearance.current
+    val (colorPalette, typography) = LocalAppearance.current
     val menuState = LocalMenuState.current
 
     val horizontalBottomPaddingValues = windowInsets
@@ -148,11 +155,41 @@ fun Queue(
     var shouldBePlaying by remember { mutableStateOf(binder.player.shouldBePlaying) }
     var previousMediaId by remember { mutableStateOf(windows[mediaItemIndex].mediaItem.mediaId) }
 
+    val customQueueWindows by remember {
+        derivedStateOf {
+            if (mediaItemIndex < 0) emptyList()
+            else windows
+                .drop(mediaItemIndex + 1)
+                .takeWhile { it.mediaItem.mediaMetadata.extras?.getBoolean(CUSTOM_QUEUE_KEY) == true }
+        }
+    }
+
+    val playlistQueueWindows by remember {
+        derivedStateOf {
+            if (mediaItemIndex < 0) emptyList()
+            else windows.drop(mediaItemIndex + 1 + customQueueWindows.size)
+        }
+    }
+
     val lazyListState = rememberLazyListState()
-    val reorderingState = rememberReorderingState(
+    val customQueueReorderingState = rememberReorderingState(
         lazyListState = lazyListState,
-        key = windows,
-        onDragEnd = binder.player::moveMediaItem
+        key = customQueueWindows,
+        extraItemCount = if (mediaItemIndex >= 0) 3 else 0,
+        onDragEnd = { fromIndex, toIndex ->
+            binder.player.moveCustomQueueItem(fromIndex, toIndex)
+        }
+    )
+
+    val playlistQueueReorderingState = rememberReorderingState(
+        lazyListState = lazyListState,
+        key = playlistQueueWindows,
+        extraItemCount = if (mediaItemIndex >= 0) {
+            3 + customQueueWindows.size + if (customQueueWindows.isNotEmpty()) 1 else 0
+        } else 0,
+        onDragEnd = { fromIndex, toIndex ->
+            binder.player.movePlaylistQueueItem(fromIndex, toIndex)
+        }
     )
 
     val visibleSuggestions by remember {
@@ -171,7 +208,6 @@ fun Queue(
     }
 
     LaunchedEffect(mediaItemIndex, shouldLoadSuggestions) {
-        // TODO: I hate all of this
         runCatching {
             val newMediaId = windows[mediaItemIndex].mediaItem.mediaId
             if (previousMediaId == newMediaId && suggestions?.getOrNull()
@@ -249,13 +285,20 @@ fun Queue(
             }
         }
     ) {
-        val musicBarsTransition = updateTransition(
-            targetState = if (reorderingState.isDragging) -1L else mediaItemIndex,
-            label = ""
-        )
+        val queueLabel by remember {
+            derivedStateOf {
+                windows.getOrNull(mediaItemIndex)
+                    ?.mediaItem
+                    ?.mediaMetadata
+                    ?.albumTitle
+                    ?.toString()
+                    ?.takeIf { it.isNotBlank() }
+                    ?: if (binder.isLoadingRadio) "Radio" else "Queue"
+            }
+        }
 
         LaunchedEffect(Unit) {
-            lazyListState.scrollToItem(mediaItemIndex.coerceAtLeast(0))
+            lazyListState.scrollToItem(0)
         }
 
         Column {
@@ -274,90 +317,147 @@ fun Queue(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.nestedScroll(scrollConnection)
                     ) {
-                        itemsIndexed(
-                            items = windows,
-                            key = { _, window -> window.uid.hashCode() },
-                            contentType = { _, _ -> ContentType.Window }
-                        ) { i, window ->
-                            val isPlayingThisMediaItem = mediaItemIndex == window.firstPeriodIndex
+                        if (mediaItemIndex >= 0) {
+                            item(
+                                key = "current_header",
+                                contentType = { ContentType.Section }
+                            ) {
+                                QueueSectionHeader(
+                                    text = "Currently playing",
+                                    color = colorPalette.textDisabled,
+                                    style = typography.s.semiBold
+                                )
+                            }
 
-                            SongItem(
-                                song = window.mediaItem,
-                                thumbnailSize = Dimensions.thumbnails.song,
-                                onThumbnailContent = {
-                                    musicBarsTransition.AnimatedVisibility(
-                                        visible = { it == window.firstPeriodIndex },
-                                        enter = fadeIn(tween(800)),
-                                        exit = fadeOut(tween(800))
-                                    ) {
-                                        Box(
-                                            contentAlignment = Alignment.Center,
-                                            modifier = Modifier
-                                                .background(
-                                                    color = Color.Black.copy(alpha = 0.25f),
-                                                    shape = thumbnailShape
-                                                )
-                                                .size(Dimensions.thumbnails.song)
-                                        ) {
-                                            if (shouldBePlaying) MusicBars(
-                                                color = colorPalette.onOverlay,
-                                                modifier = Modifier.height(24.dp)
-                                            ) else Image(
-                                                painter = painterResource(R.drawable.play),
-                                                contentDescription = null,
-                                                colorFilter = ColorFilter.tint(colorPalette.onOverlay),
-                                                modifier = Modifier.size(24.dp)
+                            item(
+                                key = "current_item",
+                                contentType = { ContentType.Window }
+                            ) {
+                                windows.getOrNull(mediaItemIndex)?.let { window ->
+                                    QueueSongItem(
+                                        mediaItem = window.mediaItem,
+                                        isPlayingThisMediaItem = true,
+                                        shouldBePlaying = shouldBePlaying,
+                                        reorderingState = null,
+                                        onClick = null,
+                                        onSwipeRemove = null,
+                                        onMenu = {
+                                            QueuedMediaItemMenu(
+                                                mediaItem = window.mediaItem,
+                                                indexInQueue = null,
+                                                onDismiss = menuState::hide
                                             )
                                         }
-                                    }
-                                },
-                                trailingContent = {
-                                    ReorderHandle(
-                                        reorderingState = reorderingState,
-                                        index = i
                                     )
-                                },
-                                modifier = Modifier
-                                    .combinedClickable(
-                                        onLongClick = {
-                                            menuState.display {
-                                                QueuedMediaItemMenu(
-                                                    mediaItem = window.mediaItem,
-                                                    indexInQueue = if (isPlayingThisMediaItem) null
-                                                    else window.firstPeriodIndex,
-                                                    onDismiss = menuState::hide
-                                                )
-                                            }
-                                        },
-                                        onClick = {
-                                            if (isPlayingThisMediaItem) {
-                                                if (shouldBePlaying) binder.player.pause() else binder.player.play()
-                                            } else {
-                                                binder.player.seekToDefaultPosition(window.firstPeriodIndex)
-                                                binder.player.playWhenReady = true
-                                            }
-                                        }
-                                    )
-                                    .animateItemPlacement(reorderingState)
+                                }
+                            }
+                        }
+
+                        if (customQueueWindows.isNotEmpty()) {
+                            item(
+                                key = "custom_header",
+                                contentType = { ContentType.Section }
+                            ) {
+                                QueueSectionHeader(
+                                    text = "Next up",
+                                    color = colorPalette.textDisabled,
+                                    style = typography.s.semiBold
+                                )
+                            }
+
+                            itemsIndexed(
+                                items = customQueueWindows,
+                                key = { _, window -> window.uid.hashCode() },
+                                contentType = { _, _ -> ContentType.CustomQueue }
+                            ) { i, window ->
+                                val itemModifier = Modifier
+                                    .animateItemPlacement(customQueueReorderingState)
                                     .draggedItem(
-                                        reorderingState = reorderingState,
+                                        reorderingState = customQueueReorderingState,
                                         index = i
                                     )
-                                    .background(colorPalette.background1)
-                                    .let {
-                                        if (PlayerPreferences.horizontalSwipeToRemoveItem && !isPlayingThisMediaItem)
-                                            it.swipeToClose(
-                                                key = windows,
-                                                delay = 100.milliseconds,
-                                                requireUnconsumed = true
-                                            ) {
-                                                binder.player.removeMediaItem(window.firstPeriodIndex)
-                                            }
-                                        else it
+
+                                QueueSongItem(
+                                    mediaItem = window.mediaItem,
+                                    isPlayingThisMediaItem = mediaItemIndex == window.firstPeriodIndex,
+                                    shouldBePlaying = shouldBePlaying,
+                                    reorderingState = customQueueReorderingState,
+                                    modifier = itemModifier,
+                                    onClick = {
+                                        binder.player.playAtIndex(window.firstPeriodIndex)
                                     },
-                                clip = !reorderingState.isDragging,
-                                hideExplicit = !isPlayingThisMediaItem && AppearancePreferences.hideExplicit
-                            )
+                                    onSwipeRemove = {
+                                        binder.player.removeCustomQueueItem(i)
+                                    },
+                                    onMenu = {
+                                        QueuedMediaItemMenu(
+                                            mediaItem = window.mediaItem,
+                                            indexInQueue = if (mediaItemIndex == window.firstPeriodIndex) null
+                                            else window.firstPeriodIndex,
+                                            onDismiss = menuState::hide
+                                        )
+                                    },
+                                    onReorderHandle = {
+                                        ReorderHandle(
+                                            reorderingState = customQueueReorderingState,
+                                            index = i
+                                        )
+                                    }
+                                )
+                            }
+                        }
+
+                        if (playlistQueueWindows.isNotEmpty()) {
+                            item(
+                                key = "playlist_header",
+                                contentType = { ContentType.Section }
+                            ) {
+                                QueueSectionHeaderWithSubtitle(
+                                    title = "Next from",
+                                    subtitle = queueLabel,
+                                    color = colorPalette.textDisabled,
+                                    style = typography.s.semiBold
+                                )
+                            }
+
+                            itemsIndexed(
+                                items = playlistQueueWindows,
+                                key = { _, window -> window.uid.hashCode() },
+                                contentType = { _, _ -> ContentType.PlaylistQueue }
+                            ) { i, window ->
+                                val itemModifier = Modifier
+                                    .animateItemPlacement(playlistQueueReorderingState)
+                                    .draggedItem(
+                                        reorderingState = playlistQueueReorderingState,
+                                        index = i
+                                    )
+
+                                QueueSongItem(
+                                    mediaItem = window.mediaItem,
+                                    isPlayingThisMediaItem = mediaItemIndex == window.firstPeriodIndex,
+                                    shouldBePlaying = shouldBePlaying,
+                                    reorderingState = playlistQueueReorderingState,
+                                    modifier = itemModifier,
+                                    onClick = {
+                                        binder.player.playAtIndex(window.firstPeriodIndex)
+                                    },
+                                    onSwipeRemove = null,
+                                    onMenu = {
+                                        BaseMediaItemMenu(
+                                            onDismiss = { menuState.hide() },
+                                            mediaItem = window.mediaItem,
+                                            onEnqueue = { binder.player.enqueue(window.mediaItem) },
+                                            onPlayNext = { binder.player.addNext(window.mediaItem) }
+                                        )
+                                    },
+                                    onReorderHandle = {
+                                        ReorderHandle(
+                                            reorderingState = playlistQueueReorderingState,
+                                            index = i
+                                        )
+                                    }
+                                )
+                            }
                         }
 
                         item(
@@ -437,10 +537,10 @@ fun Queue(
                 FloatingActionsContainerWithScrollToTop(
                     lazyListState = lazyListState,
                     icon = R.drawable.shuffle,
-                    visible = !reorderingState.isDragging,
+                    visible = !customQueueReorderingState.isDragging && !playlistQueueReorderingState.isDragging,
                     insets = windowInsets.only(WindowInsetsSides.Horizontal),
                     onClick = {
-                        reorderingState.coroutineScope.launch {
+                        customQueueReorderingState.coroutineScope.launch {
                             lazyListState.smoothScrollToTop()
                         }.invokeOnCompletion {
                             binder.player.shuffleQueue()
@@ -584,6 +684,85 @@ fun Queue(
     }
 }
 
+@Composable
+private fun QueueSectionHeader(
+    text: String,
+    color: Color,
+    style: androidx.compose.ui.text.TextStyle,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 28.dp, vertical = 8.dp)
+    ) {
+        HorizontalDivider(modifier = Modifier.weight(1f))
+
+        BasicText(
+            text = text,
+            style = style.copy(
+                textAlign = TextAlign.Center,
+                color = color
+            ),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 12.dp)
+        )
+
+        HorizontalDivider(modifier = Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun QueueSectionHeaderWithSubtitle(
+    title: String,
+    subtitle: String,
+    color: Color,
+    style: androidx.compose.ui.text.TextStyle,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 28.dp, vertical = 8.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            HorizontalDivider(modifier = Modifier.weight(1f))
+
+            BasicText(
+                text = title,
+                style = style.copy(
+                    textAlign = TextAlign.Center,
+                    color = color
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 12.dp)
+            )
+
+            HorizontalDivider(modifier = Modifier.weight(1f))
+        }
+
+        BasicText(
+            text = subtitle,
+            style = style.copy(
+                textAlign = TextAlign.Center,
+                color = color
+            ),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
 @JvmInline
 private value class ContentType private constructor(val value: Int) {
     companion object {
@@ -591,5 +770,77 @@ private value class ContentType private constructor(val value: Int) {
         val Divider = ContentType(value = 1)
         val Suggestion = ContentType(value = 2)
         val Placeholder = ContentType(value = 3)
+        val Section = ContentType(value = 4)
+        val CustomQueue = ContentType(value = 5)
+        val PlaylistQueue = ContentType(value = 6)
     }
+}
+
+@Composable
+private fun QueueSongItem(
+    mediaItem: MediaItem,
+    isPlayingThisMediaItem: Boolean,
+    shouldBePlaying: Boolean,
+    reorderingState: ReorderingState?,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    onSwipeRemove: (() -> Unit)?,
+    onMenu: @Composable () -> Unit,
+    onReorderHandle: (@Composable () -> Unit)? = null
+) {
+    val (colorPalette, _, _, thumbnailShape) = LocalAppearance.current
+    val menuState = LocalMenuState.current
+
+    SongItem(
+        song = mediaItem,
+        thumbnailSize = Dimensions.thumbnails.song,
+        onThumbnailContent = {
+            AnimatedVisibility(
+                visible = isPlayingThisMediaItem,
+                enter = fadeIn(tween(800)),
+                exit = fadeOut(tween(800))
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .background(
+                            color = Color.Black.copy(alpha = 0.25f),
+                            shape = thumbnailShape
+                        )
+                        .size(Dimensions.thumbnails.song)
+                ) {
+                    if (shouldBePlaying) MusicBars(
+                        color = colorPalette.onOverlay,
+                        modifier = Modifier.height(24.dp)
+                    ) else Image(
+                        painter = painterResource(R.drawable.play),
+                        contentDescription = null,
+                        colorFilter = ColorFilter.tint(colorPalette.onOverlay),
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+        },
+        trailingContent = onReorderHandle,
+        modifier = modifier
+            .combinedClickable(
+                onLongClick = { menuState.display { onMenu() } },
+                onClick = { onClick?.invoke() }
+            )
+            .let { modifier ->
+                var itemModifier = modifier.background(colorPalette.background1)
+                if (onSwipeRemove != null && PlayerPreferences.horizontalSwipeToRemoveItem && !isPlayingThisMediaItem) {
+                    itemModifier = itemModifier.swipeToClose(
+                        key = mediaItem.mediaId,
+                        delay = 100.milliseconds,
+                        requireUnconsumed = true
+                    ) {
+                        onSwipeRemove()
+                    }
+                }
+                itemModifier
+            },
+        clip = reorderingState == null || !reorderingState.isDragging,
+        hideExplicit = !isPlayingThisMediaItem && AppearancePreferences.hideExplicit
+    )
 }

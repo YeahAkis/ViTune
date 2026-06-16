@@ -87,6 +87,7 @@ import app.vitune.android.utils.activityPendingIntent
 import app.vitune.android.utils.asDataSource
 import app.vitune.android.utils.broadcastPendingIntent
 import app.vitune.android.utils.defaultDataSource
+import app.vitune.android.utils.clearCustomQueue
 import app.vitune.android.utils.findCause
 import app.vitune.android.utils.findNextMediaItemById
 import app.vitune.android.utils.forcePlayFromBeginning
@@ -1141,7 +1142,7 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
 
                 handler.post {
                     player.pause()
-                    player.stop()
+                    // player.stop()
 
                     glyphInterface.glyph {
                         turnOff()
@@ -1184,6 +1185,8 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
                     val items = radioData.process().let { Database.filterBlacklistedSongs(it) }
 
                     withContext(Dispatchers.Main) {
+                        player.clearCustomQueue()
+
                         if (justAdd) player.addMediaItems(items.drop(1))
                         else player.forcePlayFromBeginning(items)
                     }
