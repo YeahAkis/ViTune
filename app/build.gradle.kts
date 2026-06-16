@@ -41,6 +41,8 @@ android {
                 arguments += listOf("-DANDROID_STL=c++_static")
             }
         }
+
+        manifestPlaceholders["disableFrameRateOverride"] = "true"
     }
 
     splits {

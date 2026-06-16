@@ -58,6 +58,13 @@
         android:appCategory="audio"
         tools:ignore="UnusedAttribute">
 
+        <property
+            android:name="android.content.PROPERTY_COMPAT_OVERRIDE_FRAME_RATE"
+            android:value="false" />
+        <property
+            android:name="android.view.PROPERTY_COMPAT_OVERRIDE_FRAME_RATE_BEHAVIOR"
+            android:value="false" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -69,7 +76,7 @@
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-                <action android:name="android.intent.action.MUSIC_PLAYER" /> <!-- Not a real action, but apparently some apps query for this -->
+                <action android:name="android.intent.action.MUSIC_PLAYER" />
 
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.APP_MUSIC" />
