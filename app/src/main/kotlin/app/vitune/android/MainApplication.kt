@@ -568,7 +568,11 @@ object Dependencies {
         Python.getInstance()
     }
 
-    private val module by lazy { py.getModule("download") }
+    private val module by lazy {
+        py.getModule("download").also {
+            it.callAttr("prewarm", quickjsPath.absolutePath)
+        }
+    }
 
     val quickjsPath by lazy {
         File(application.applicationInfo.nativeLibraryDir, "libqjs.so")
