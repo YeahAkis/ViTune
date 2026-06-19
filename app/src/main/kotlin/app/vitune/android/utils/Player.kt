@@ -103,15 +103,30 @@ fun Player.playAtIndex(index: Int) {
     playWhenReady = true
 }
 
-fun Player.shuffleQueue() {
-    val mediaItems = currentTimeline
-        .mediaItems
-        .toMutableList()
-        .apply { removeAt(currentMediaItemIndex) }
+fun Player.shuffleCustomQueue() {
+    val startIndex = customQueueStartIndex()
+    val count = customQueueCount()
+    if (count <= 1) return
+
+    val shuffled = currentTimeline.mediaItems
+        .subList(startIndex, startIndex + count)
         .shuffled()
 
-    safeClearQueue()
-    addMediaItems(mediaItems)
+    removeMediaItems(startIndex, startIndex + count)
+    addMediaItems(startIndex, shuffled)
+}
+
+fun Player.shufflePlaylistQueue() {
+    val startIndex = playlistQueueStartIndex()
+    val count = mediaItemCount - startIndex
+    if (count <= 1) return
+
+    val shuffled = currentTimeline.mediaItems
+        .subList(startIndex, startIndex + count)
+        .shuffled()
+
+    removeMediaItems(startIndex, startIndex + count)
+    addMediaItems(startIndex, shuffled)
 }
 
 fun Player.forcePlay(mediaItem: MediaItem) {

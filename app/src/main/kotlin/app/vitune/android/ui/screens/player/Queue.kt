@@ -98,7 +98,8 @@ import app.vitune.android.utils.moveCustomQueueItem
 import app.vitune.android.utils.movePlaylistQueueItem
 import app.vitune.android.utils.semiBold
 import app.vitune.android.utils.shouldBePlaying
-import app.vitune.android.utils.shuffleQueue
+import app.vitune.android.utils.shuffleCustomQueue
+import app.vitune.android.utils.shufflePlaylistQueue
 import app.vitune.android.utils.smoothScrollToTop
 import app.vitune.android.utils.windows
 import app.vitune.compose.persist.persist
@@ -361,7 +362,14 @@ fun Queue(
                                 QueueSectionHeader(
                                     text = "Next up",
                                     color = colorPalette.textDisabled,
-                                    style = typography.s.semiBold
+                                    style = typography.s.semiBold,
+                                    onShuffle = {
+                                        customQueueReorderingState.coroutineScope.launch {
+                                            lazyListState.smoothScrollToTop()
+                                        }.invokeOnCompletion {
+                                            binder.player.shuffleCustomQueue()
+                                        }
+                                    }
                                 )
                             }
 
@@ -416,7 +424,14 @@ fun Queue(
                                     title = "Next from",
                                     subtitle = queueLabel,
                                     color = colorPalette.textDisabled,
-                                    style = typography.s.semiBold
+                                    style = typography.s.semiBold,
+                                    onShuffle = {
+                                        playlistQueueReorderingState.coroutineScope.launch {
+                                            lazyListState.smoothScrollToTop()
+                                        }.invokeOnCompletion {
+                                            binder.player.shufflePlaylistQueue()
+                                        }
+                                    }
                                 )
                             }
 
@@ -536,16 +551,7 @@ fun Queue(
 
                 FloatingActionsContainerWithScrollToTop(
                     lazyListState = lazyListState,
-                    icon = R.drawable.shuffle,
-                    visible = !customQueueReorderingState.isDragging && !playlistQueueReorderingState.isDragging,
-                    insets = windowInsets.only(WindowInsetsSides.Horizontal),
-                    onClick = {
-                        customQueueReorderingState.coroutineScope.launch {
-                            lazyListState.smoothScrollToTop()
-                        }.invokeOnCompletion {
-                            binder.player.shuffleQueue()
-                        }
-                    }
+                    insets = windowInsets.only(WindowInsetsSides.Horizontal)
                 )
             }
 
@@ -689,7 +695,8 @@ private fun QueueSectionHeader(
     text: String,
     color: Color,
     style: androidx.compose.ui.text.TextStyle,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onShuffle: (() -> Unit)? = null
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -700,16 +707,28 @@ private fun QueueSectionHeader(
     ) {
         HorizontalDivider(modifier = Modifier.weight(1f))
 
-        BasicText(
-            text = text,
-            style = style.copy(
-                textAlign = TextAlign.Center,
-                color = color
-            ),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.padding(horizontal = 12.dp)
-        )
+        ) {
+            BasicText(
+                text = text,
+                style = style.copy(
+                    textAlign = TextAlign.Center,
+                    color = color
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            if (onShuffle != null) IconButton(
+                icon = R.drawable.shuffle,
+                color = color,
+                onClick = onShuffle,
+                modifier = Modifier.size(16.dp)
+            )
+        }
 
         HorizontalDivider(modifier = Modifier.weight(1f))
     }
@@ -721,7 +740,8 @@ private fun QueueSectionHeaderWithSubtitle(
     subtitle: String,
     color: Color,
     style: androidx.compose.ui.text.TextStyle,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onShuffle: (() -> Unit)? = null
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -736,16 +756,28 @@ private fun QueueSectionHeaderWithSubtitle(
         ) {
             HorizontalDivider(modifier = Modifier.weight(1f))
 
-            BasicText(
-                text = title,
-                style = style.copy(
-                    textAlign = TextAlign.Center,
-                    color = color
-                ),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.padding(horizontal = 12.dp)
-            )
+            ) {
+                BasicText(
+                    text = title,
+                    style = style.copy(
+                        textAlign = TextAlign.Center,
+                        color = color
+                    ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                if (onShuffle != null) IconButton(
+                    icon = R.drawable.shuffle,
+                    color = color,
+                    onClick = onShuffle,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
 
             HorizontalDivider(modifier = Modifier.weight(1f))
         }
