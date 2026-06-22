@@ -2,6 +2,7 @@ package app.vitune.android.ui.screens.settings
 
 import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
+import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -9,22 +10,29 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import app.vitune.android.Database
+import app.vitune.android.DatabaseDependency
 import app.vitune.android.R
 import app.vitune.android.internal
 import app.vitune.android.preferences.DataPreferences
 import app.vitune.android.query
 import app.vitune.android.service.PlayerService
+import app.vitune.android.service.PrecacheService
 import app.vitune.android.transaction
 import app.vitune.android.ui.screens.Route
-import app.vitune.android.utils.intent
 import app.vitune.android.utils.toast
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -35,6 +43,7 @@ import kotlin.system.exitProcess
 @Composable
 fun DatabaseSettings() = with(DataPreferences) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
 
     val eventsCount by remember { Database.eventsCount().distinctUntilChanged() }
         .collectAsState(initial = 0)
@@ -61,22 +70,43 @@ fun DatabaseSettings() = with(DataPreferences) {
     ) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
 
-        query {
-            Database.checkpoint()
-            Database.internal.close()
+        coroutineScope.launch {
+            withContext(Dispatchers.IO) {
+                context.stopService(Intent(context, PlayerService::class.java))
+                context.stopService(Intent(context, PrecacheService::class.java))
 
-            with(context) {
-                applicationContext.contentResolver.openInputStream(uri)
+                Database.checkpoint()
+                Database.internal.close()
+
+                val dbFile = File(Database.internal.path)
+                val tempFile = File(dbFile.parentFile, "${dbFile.name}.restoring")
+
+                context.applicationContext.contentResolver.openInputStream(uri)
                     ?.use { inputStream ->
-                        FileOutputStream(Database.internal.path).use { outputStream ->
+                        FileOutputStream(tempFile).use { outputStream ->
                             inputStream.copyTo(outputStream)
+                            outputStream.fd.sync()
                         }
-                    }
+                    } ?: error("Could not open backup file")
 
-                stopService(intent<PlayerService>())
+                File("${dbFile.path}-wal").delete()
+                File("${dbFile.path}-shm").delete()
+                if (dbFile.exists() && !dbFile.delete()) error("Could not replace database")
+                if (!tempFile.renameTo(dbFile)) error("Could not move restored database into place")
+
+                DatabaseDependency.reload()
             }
 
-            exitProcess(0)
+            withContext(Dispatchers.Main) {
+                val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+                    ?: return@withContext
+
+                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                context.startActivity(launchIntent)
+
+                delay(250)
+                exitProcess(0)
+            }
         }
     }
 
