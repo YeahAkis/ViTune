@@ -1,7 +1,5 @@
 package app.vitune.android
 
-import app.vitune.android.utils.NewPipeDownloader
-import org.schabi.newpipe.extractor.NewPipe
 import android.app.Application
 import android.content.ComponentName
 import android.content.Context
@@ -89,6 +87,7 @@ import app.vitune.android.utils.LocalMonetCompat
 import app.vitune.android.utils.asMediaItem
 import app.vitune.android.utils.collectProvidedBitmapAsState
 import app.vitune.android.utils.forcePlay
+import app.vitune.android.utils.NewPipeDownloader
 import app.vitune.android.utils.intent
 import app.vitune.android.utils.invokeOnReady
 import app.vitune.android.utils.isInPip
@@ -116,6 +115,7 @@ import app.vitune.providers.innertube.Innertube
 import app.vitune.providers.innertube.models.bodies.BrowseBody
 import app.vitune.providers.innertube.requests.playlistPage
 import app.vitune.providers.innertube.requests.song
+import org.schabi.newpipe.extractor.NewPipe
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
@@ -594,10 +594,20 @@ object Dependencies {
     }
 
     val credentialManager by lazy { CredentialManager.create(application) }
+    @Volatile
+    private var newPipeInitialized = false
+
+    fun ensureNewPipeInitialized() {
+        if (newPipeInitialized) return
+        synchronized(this) {
+            if (newPipeInitialized) return
+            NewPipe.init(NewPipeDownloader())
+            newPipeInitialized = true
+        }
+    }
 
     internal fun init(application: MainApplication) {
         this.application = application
-        NewPipe.init(NewPipeDownloader())
     }
 }
 

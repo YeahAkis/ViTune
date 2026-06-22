@@ -1420,6 +1420,7 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
                         runCatching { youtubeFormat?.url?.toUri() }.getOrNull() ?: throw IllegalStateException("Unplayable")
                     }
                     ExtractorMode.NewPipe -> {
+                        Dependencies.ensureNewPipeInitialized()
                         val streamInfo = runCatching {
                             org.schabi.newpipe.extractor.stream.StreamInfo.getInfo(
                                 org.schabi.newpipe.extractor.NewPipe.getService(0),

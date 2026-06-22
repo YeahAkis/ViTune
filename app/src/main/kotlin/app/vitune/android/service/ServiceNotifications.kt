@@ -76,10 +76,18 @@ abstract class NotificationChannels {
             context: Context,
             notification: NotificationCompat.Builder.() -> NotificationCompat.Builder
         ) = runCatching {
-            handler.post {
+            val start = {
                 upsertChannel(context)
                 val (id, notif) = createNotification(context, notification)
                 s.startForeground(id, notif)
+            }
+
+            if (Looper.myLooper() == Looper.getMainLooper()) {
+                start()
+            } else {
+                handler.post {
+                    start()
+                }
             }
         }
 
