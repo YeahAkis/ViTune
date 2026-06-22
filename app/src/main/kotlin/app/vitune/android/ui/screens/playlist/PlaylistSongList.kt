@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -179,6 +180,10 @@ fun PlaylistSongList(
     val lazyListState = rememberLazyListState()
 
     val (currentMediaId, playing) = playingSong(binder)
+    val songs = playlistPage?.songsPage?.items.orEmpty()
+    val mediaItems = remember(songs) {
+        songs.map(Innertube.SongItem::asMediaItem)
+    }
 
     LayoutWithAdaptiveThumbnail(
         thumbnailContent = thumbnailContent,
@@ -200,12 +205,16 @@ fun PlaylistSongList(
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         headerContent()
-                        if (!isLandscape) thumbnailContent()
+                if (!isLandscape) thumbnailContent()
                         PlaylistInfo(playlist = playlistPage)
                     }
                 }
 
-                itemsIndexed(items = playlistPage?.songsPage?.items ?: emptyList()) { index, song ->
+                itemsIndexed(
+                    items = songs,
+                    key = { _, song -> song.key },
+                    contentType = { _, _ -> 0 }
+                ) { index, song ->
                     SongItem(
                         song = song,
                         thumbnailSize = Dimensions.thumbnails.song,
@@ -220,11 +229,8 @@ fun PlaylistSongList(
                                     }
                                 },
                                 onClick = {
-                                    playlistPage?.songsPage?.items?.map(Innertube.SongItem::asMediaItem)
-                                        ?.let { mediaItems ->
-                                            binder?.stopRadio()
-                                            binder?.player?.forcePlayAtIndex(mediaItems, index)
-                                        }
+                                    binder?.stopRadio()
+                                    binder?.player?.forcePlayAtIndex(mediaItems, index)
                                 }
                             ),
                         isPlaying = playing && currentMediaId == song.key

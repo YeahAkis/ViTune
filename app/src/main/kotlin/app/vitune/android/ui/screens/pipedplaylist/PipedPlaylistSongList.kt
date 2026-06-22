@@ -66,8 +66,8 @@ fun PipedPlaylistSongList(
     val menuState = LocalMenuState.current
 
     var playlist by persist<Playlist>(tag = "pipedplaylist/$playlistId/playlistPage")
-    val mediaItems = remember(playlist) {
-        playlist?.videos?.mapNotNull { it.asMediaItem }?.toImmutableList()
+    val mediaItems = remember(playlist?.videos) {
+        playlist?.videos?.mapNotNull(Playlist.Video::asMediaItem)?.toImmutableList()
     }
 
     LaunchedEffect(Unit) {
@@ -125,7 +125,11 @@ fun PipedPlaylistSongList(
                     }
                 }
 
-                itemsIndexed(items = playlist?.videos ?: emptyList()) { index, song ->
+                itemsIndexed(
+                    items = playlist?.videos ?: emptyList(),
+                    key = { index, song -> song.id ?: index },
+                    contentType = { _, _ -> 0 }
+                ) { index, song ->
                     song.asMediaItem?.let { mediaItem ->
                         SongItem(
                             song = mediaItem,
@@ -140,11 +144,8 @@ fun PipedPlaylistSongList(
                                     }
                                 },
                                 onClick = {
-                                    playlist?.videos?.mapNotNull(Playlist.Video::asMediaItem)
-                                        ?.let { mediaItems ->
-                                            binder?.stopRadio()
-                                            binder?.player?.forcePlayAtIndex(mediaItems, index)
-                                        }
+                                    binder?.stopRadio()
+                                    mediaItems?.let { binder?.player?.forcePlayAtIndex(it, index) }
                                 }
                             ),
                             isPlaying = playing && currentMediaId == song.id

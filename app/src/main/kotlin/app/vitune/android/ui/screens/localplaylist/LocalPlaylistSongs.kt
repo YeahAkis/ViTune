@@ -98,6 +98,7 @@ fun LocalPlaylistSongs(
 
     val coroutineScope = rememberCoroutineScope()
     val lazyListState = rememberLazyListState()
+    val mediaItems = remember(songs) { songs.map(Song::asMediaItem) }
 
     var loading by remember { mutableStateOf(false) }
 
@@ -172,7 +173,7 @@ fun LocalPlaylistSongs(
                                 text = stringResource(R.string.enqueue),
                                 enabled = songs.isNotEmpty(),
                                 onClick = {
-                                    binder?.player?.enqueue(songs.map { it.asMediaItem })
+                                    binder?.player?.enqueue(mediaItems)
                                 }
                             )
 
@@ -183,7 +184,7 @@ fun LocalPlaylistSongs(
                             }
 
                             PlaylistDownloadIcon(
-                                songs = songs.map { it.asMediaItem }.toImmutableList()
+                                songs = mediaItems.toImmutableList()
                             )
 
                             HeaderIconButton(
@@ -290,14 +291,11 @@ fun LocalPlaylistSongs(
                                         )
                                     }
                                 },
-                                onClick = {
-                                    binder?.stopRadio()
-                                    binder?.player?.forcePlayAtIndex(
-                                        items = songs.map { it.asMediaItem },
-                                        index = index
-                                    )
-                                }
-                            )
+                            onClick = {
+                                binder?.stopRadio()
+                                binder?.player?.forcePlayAtIndex(mediaItems, index)
+                            }
+                        )
                             .animateItemPlacement(reorderingState)
                             .draggedItem(
                                 reorderingState = reorderingState,
