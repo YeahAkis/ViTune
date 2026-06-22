@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
 import app.vitune.android.LocalPlayerServiceBinder
 import app.vitune.android.R
+import app.vitune.android.preferences.ExtractorMode
 import app.vitune.android.preferences.PlayerPreferences
 import app.vitune.android.service.PlayerService
 import app.vitune.android.ui.components.themed.SecondaryTextButton
@@ -80,6 +81,16 @@ fun PlayerSettings() = with(PlayerPreferences) {
                     onRestart = { changed = false }
                 )
             }
+
+            EnumValueSelectorSettingsEntry(
+                title = "Extractor",
+                selectedValue = extractorMode,
+                onValueSelect = {
+                    extractorMode = it
+                    changed = true
+                },
+                valueText = { it.name }
+            )
 
             SwitchSettingsEntry(
                 title = stringResource(R.string.skip_silence),

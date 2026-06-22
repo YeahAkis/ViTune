@@ -240,6 +240,8 @@ dependencies {
     implementation(projects.core.data)
     implementation(projects.core.ui)
 
+    implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.3")
+
     detektPlugins(libs.detekt.compose)
     detektPlugins(libs.detekt.formatting)
 }

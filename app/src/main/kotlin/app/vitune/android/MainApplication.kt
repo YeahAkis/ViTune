@@ -1,5 +1,7 @@
 package app.vitune.android
 
+import app.vitune.android.utils.NewPipeDownloader
+import org.schabi.newpipe.extractor.NewPipe
 import android.app.Application
 import android.content.ComponentName
 import android.content.Context
@@ -595,6 +597,7 @@ object Dependencies {
 
     internal fun init(application: MainApplication) {
         this.application = application
+        NewPipe.init(NewPipeDownloader())
     }
 }
 

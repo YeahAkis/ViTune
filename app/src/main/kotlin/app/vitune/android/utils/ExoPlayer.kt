@@ -3,6 +3,7 @@
 package app.vitune.android.utils
 
 import android.content.Context
+import android.net.Uri
 import android.util.Log
 import androidx.annotation.OptIn
 import androidx.media3.common.C
@@ -14,6 +15,7 @@ import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException
 import androidx.media3.datasource.ResolvingDataSource
+import androidx.media3.datasource.TransferListener
 import androidx.media3.datasource.cache.Cache
 import androidx.media3.datasource.cache.CacheDataSource
 import java.io.EOFException
@@ -182,10 +184,59 @@ fun DataSource.Factory.retryIf(
 
 val Cache.asDataSource: CacheDataSource.Factory get() = CacheDataSource.Factory().setCache(this)
 
-val Context.defaultDataSource
-    get() = DefaultDataSource.Factory(
-        this,
-        DefaultHttpDataSource.Factory().setConnectTimeoutMs(16000)
-            .setReadTimeoutMs(8000)
-            .setUserAgent("Mozilla/5.0 (Windows NT 10.0; rv:91.0) Gecko/20100101 Firefox/91.0")
-    )
+class UserAgentOverridingDataSourceFactory(
+    private val context: Context,
+    private val connectTimeoutMs: Int = 16_000,
+    private val readTimeoutMs: Int = 8_000
+) : DataSource.Factory {
+    inner class Source : DataSource {
+        private var inner: DataSource? = null
+        private var uri: Uri? = null
+        private var headers: Map<String, List<String>> = emptyMap()
+        private var transferListeners = mutableListOf<TransferListener>()
+
+        override fun addTransferListener(transferListener: TransferListener) {
+            transferListeners.add(transferListener)
+        }
+
+        override fun open(dataSpec: DataSpec): Long {
+            Log.d("UserAgentOverridingDS", "open() called, position=${dataSpec.position}, uri=${dataSpec.uri}")
+            val ua = dataSpec.httpRequestHeaders["User-Agent"]
+            val cleanSpec = if (ua != null)
+                dataSpec.buildUpon()
+                    .setHttpRequestHeaders(
+                        dataSpec.httpRequestHeaders.filterKeys {
+                            !it.equals("User-Agent", ignoreCase = true)
+                        }
+                    )
+                    .build()
+            else dataSpec
+
+            val httpSource = DefaultHttpDataSource.Factory()
+                .setConnectTimeoutMs(connectTimeoutMs)
+                .setReadTimeoutMs(readTimeoutMs)
+                .apply { if (ua != null) setUserAgent(ua) }
+                .createDataSource()
+
+            val source = DefaultDataSource(context, httpSource)
+            transferListeners.forEach { source.addTransferListener(it) }
+            inner = source
+            return source.open(cleanSpec).also {
+                uri = source.uri
+                headers = source.responseHeaders
+            }
+        }
+
+        override fun read(buffer: ByteArray, offset: Int, length: Int) =
+            inner?.read(buffer, offset, length) ?: throw IllegalStateException("Not opened")
+
+        override fun getUri(): Uri? = uri
+        override fun getResponseHeaders() = headers
+        override fun close() = inner?.close() ?: Unit
+    }
+
+    override fun createDataSource(): DataSource = Source()
+}
+
+val Context.defaultDataSource: DataSource.Factory
+    get() = UserAgentOverridingDataSourceFactory(context = this)

@@ -73,6 +73,7 @@ import app.vitune.android.models.Song
 import app.vitune.android.models.SongWithContentLength
 import app.vitune.android.preferences.AppearancePreferences
 import app.vitune.android.preferences.DataPreferences
+import app.vitune.android.preferences.ExtractorMode
 import app.vitune.android.preferences.PlayerPreferences
 import app.vitune.android.query
 import app.vitune.android.transaction
@@ -86,8 +87,8 @@ import app.vitune.android.utils.YouTubeRadio
 import app.vitune.android.utils.activityPendingIntent
 import app.vitune.android.utils.asDataSource
 import app.vitune.android.utils.broadcastPendingIntent
-import app.vitune.android.utils.defaultDataSource
 import app.vitune.android.utils.clearCustomQueue
+import app.vitune.android.utils.defaultDataSource
 import app.vitune.android.utils.findCause
 import app.vitune.android.utils.findNextMediaItemById
 import app.vitune.android.utils.forcePlayFromBeginning
@@ -118,6 +119,7 @@ import app.vitune.core.ui.utils.songBundle
 import app.vitune.core.ui.utils.streamVolumeFlow
 import app.vitune.providers.innertube.Innertube
 import app.vitune.providers.innertube.models.NavigationEndpoint
+import app.vitune.providers.innertube.models.UserAgents
 import app.vitune.providers.innertube.models.bodies.PlayerBody
 import app.vitune.providers.innertube.models.bodies.SearchBody
 import app.vitune.providers.innertube.requests.player
@@ -1330,12 +1332,18 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
         }
 
         @Suppress("CyclomaticComplexMethod")
+        data class StreamMeta(
+            val contentLength: Long?,
+            val userAgent: String? = null,
+            val noRangeRequests: Boolean = false
+        )
+
         fun createYouTubeDataSourceResolverFactory(
             context: Context,
             cache: Cache,
             chunkLength: Long? = DEFAULT_CHUNK_LENGTH,
             findMediaItem: suspend (videoId: String) -> MediaItem? = { null },
-            uriCache: UriCache<String, Long?> = UriCache()
+            uriCache: UriCache<String, StreamMeta?> = UriCache()
         ): DataSource.Factory = ResolvingDataSource.Factory(
             ConditionalCacheDataSourceFactory(
                 cacheDataSourceFactory = cache.readOnlyWhen { PlayerPreferences.pauseCache }.asDataSource,
@@ -1346,16 +1354,30 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
             val mediaId = dataSpec.key?.removePrefix("https://youtube.com/watch?v=")
                 ?: error("A key must be set")
 
-            fun DataSpec.ranged(contentLength: Long?) = contentLength?.let {
-                if (chunkLength == null) return@let null
+            fun DataSpec.ranged(meta: StreamMeta?): DataSpec {
+                val effectiveUA = meta?.userAgent ?: UserAgents.DESKTOP
 
-                val start = dataSpec.uriPositionOffset
-                val length = (contentLength - start).coerceAtMost(chunkLength)
-                val rangeText = "$start-${start + length}"
+                return if (meta?.noRangeRequests == true) {
+                    // gir=yes formats (IOS client) 403 on a second ranged request against
+                    // the same URL — fetch the whole stream in one shot instead of chunking.
+                    this.withAdditionalHeaders(mapOf("User-Agent" to effectiveUA))
+                } else meta?.contentLength?.let { contentLength ->
+                    if (chunkLength == null) return@let null
 
-                this.subrange(start, length)
-                    .withAdditionalHeaders(mapOf("Range" to "bytes=$rangeText"))
-            } ?: this
+                    val start = dataSpec.uriPositionOffset
+                    val length = (contentLength - start).coerceAtMost(chunkLength)
+
+                    val headers = buildMap {
+                        put("Range", "bytes=$start-${start + length - 1}")
+                        put("User-Agent", effectiveUA)
+                    }
+
+                    this.subrange(start, length).withAdditionalHeaders(headers)
+                } ?: meta?.let {
+                    // contentLength is null but we still have a UA to forward
+                    this.withAdditionalHeaders(mapOf("User-Agent" to effectiveUA))
+                } ?: this // local file or other non-YouTube source: leave untouched
+            }
 
             if (
                 dataSpec.isLocal || (
@@ -1366,26 +1388,67 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
                     )
                     )
             ) dataSpec
-            else uriCache[mediaId]?.let { cachedUri ->
+            else uriCache[mediaId]?.takeIf { dataSpec.position == 0L }?.let { cachedUri ->
                 dataSpec
                     .withUri(cachedUri.uri)
                     .ranged(cachedUri.meta)
             } ?: run {
-                val body = runBlocking(Dispatchers.IO) {
-                    Innertube.player(PlayerBody(videoId = mediaId))
+                var body = runBlocking(Dispatchers.IO) {
+                    if (PlayerPreferences.extractorMode == ExtractorMode.InnerTube)
+                        Innertube.player(PlayerBody(videoId = mediaId))
+                    else null
                 }?.getOrNull()
-                val youtubeFormat = body?.streamingData?.highestQualityFormat
 
-                val info = runCatching {
-                    Dependencies.runDownload(mediaId)
-                }.mapCatching {
-                    YouTubeDLResponse.fromString(it)
-                }.also { it.exceptionOrNull()?.printStackTrace() }.getOrNull()
-                if (info?.id != mediaId) throw VideoIdMismatchException()
-                val format = info.formats?.firstOrNull { it.formatId == info.formatId }
+                var fileSize: Long? = null
+                var formatId: String? = null
+                var bitrate: Long? = null
+                var mimeType: String? = null
+                var lastModified: Long? = null
+                var userAgent: String? = null
 
-                val uri =
-                    runCatching { info.url?.toUri() }.getOrNull() ?: throw UnplayableException()
+                val uri = when (PlayerPreferences.extractorMode) {
+                    ExtractorMode.InnerTube -> {
+                        val youtubeFormat = body?.streamingData?.highestQualityFormat
+
+                        userAgent = body?.context?.client?.userAgent
+
+                        mimeType = youtubeFormat?.mimeType
+                        lastModified = youtubeFormat?.lastModified
+                        fileSize = youtubeFormat?.contentLength
+                        formatId = youtubeFormat?.itag?.toString()
+                        bitrate = youtubeFormat?.bitrate
+                        runCatching { youtubeFormat?.url?.toUri() }.getOrNull() ?: throw IllegalStateException("Unplayable")
+                    }
+                    ExtractorMode.NewPipe -> {
+                        val streamInfo = runCatching {
+                            org.schabi.newpipe.extractor.stream.StreamInfo.getInfo(
+                                org.schabi.newpipe.extractor.NewPipe.getService(0),
+                                "https://www.youtube.com/watch?v=$mediaId"
+                            )
+                        }.also { it.exceptionOrNull()?.printStackTrace() }.getOrNull()
+                            ?: throw IllegalStateException("Unplayable")
+                        val audioStream = streamInfo.audioStreams.maxByOrNull { it.bitrate } ?: throw IllegalStateException("Unplayable")
+                        fileSize = audioStream.itagItem?.contentLength?.takeIf { it > 0 }
+                        formatId = audioStream.format?.id?.toString()
+                        bitrate = audioStream.bitrate.toLong() * 1000L
+                        mimeType = audioStream.format?.mimeType
+                        runCatching { audioStream.content.toUri() }.getOrNull() ?: throw IllegalStateException("Unplayable")
+                    }
+                    ExtractorMode.YtDlp -> {
+                        val info = runCatching {
+                            Dependencies.runDownload(mediaId)
+                        }.mapCatching {
+                            YouTubeDLResponse.fromString(it)
+                        }.also { it.exceptionOrNull()?.printStackTrace() }.getOrNull()
+                        if (info?.id != mediaId) throw IllegalStateException("Video ID Mismatch")
+                        val format = info.formats?.firstOrNull { it.formatId == info.formatId }
+
+                        fileSize = info.fileSize
+                        formatId = info.formatId
+                        bitrate = format?.abr?.let { it * 1000 }?.toLong()
+                        runCatching { info.url?.toUri() }.getOrNull() ?: throw IllegalStateException("Unplayable")
+                    }
+                }
 
                 val mediaItem = runCatching {
                     runBlocking(Dispatchers.IO) { findMediaItem(mediaId) }
@@ -1410,26 +1473,32 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
                         Database.insert(
                             Format(
                                 songId = mediaId,
-                                itag = info.formatId?.toIntOrNull(),
-                                mimeType = youtubeFormat?.mimeType,
-                                bitrate = format?.abr?.let { it * 1000 }?.toLong(),
+                                itag = formatId?.toIntOrNull(),
+                                mimeType = mimeType,
+                                bitrate = bitrate,
                                 loudnessDb = body?.playerConfig?.audioConfig?.normalizedLoudnessDb,
-                                contentLength = info.fileSize,
-                                lastModified = youtubeFormat?.lastModified
+                                contentLength = fileSize,
+                                lastModified = lastModified
                             )
                         )
                     }
                 }
 
+                val streamMeta = StreamMeta(
+                    contentLength = fileSize,
+                    userAgent = userAgent,
+                    noRangeRequests = uri.getQueryParameter("gir") == "yes"
+                )
+
                 uriCache.push(
                     key = mediaId,
-                    meta = info.fileSize,
+                    meta = streamMeta,
                     uri = uri
                 )
 
                 dataSpec
                     .withUri(uri)
-                    .ranged(info.fileSize)
+                    .ranged(streamMeta)
             }
         }.handleUnknownErrors {
             uriCache.clear()
