@@ -7,22 +7,31 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationCompat
 import androidx.core.net.toUri
@@ -41,10 +50,10 @@ import app.vitune.android.ui.components.themed.CircularProgressIndicator
 import app.vitune.android.ui.components.themed.DefaultDialog
 import app.vitune.android.ui.components.themed.SecondaryTextButton
 import app.vitune.android.ui.screens.Route
-import app.vitune.android.utils.bold
-import app.vitune.android.utils.center
 import app.vitune.android.utils.hasPermission
 import app.vitune.android.utils.pendingIntent
+import app.vitune.android.utils.bold
+import app.vitune.android.utils.center
 import app.vitune.android.utils.semiBold
 import app.vitune.core.data.utils.Version
 import app.vitune.core.data.utils.version
@@ -164,10 +173,6 @@ private suspend fun Version.getNewerVersion(
 @Composable
 fun About() = SettingsCategoryScreen(
     title = stringResource(R.string.about),
-    description = stringResource(
-        R.string.format_version_credits,
-        VERSION_NAME
-    )
 ) {
     val (_, typography) = LocalAppearance.current
     val uriHandler = LocalUriHandler.current
@@ -183,6 +188,11 @@ fun About() = SettingsCategoryScreen(
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
         onResult = { hasPermission = it }
+    )
+
+    AboutVersionCredits(
+        versionName = VERSION_NAME,
+        modifier = Modifier.padding(bottom = 16.dp)
     )
 
     SettingsGroup(title = stringResource(R.string.social)) {
@@ -284,5 +294,53 @@ fun About() = SettingsCategoryScreen(
             text = stringResource(R.string.up_to_date),
             style = typography.xs.semiBold.center
         ) else CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+    }
+}
+
+@Composable
+private fun AboutVersionCredits(
+    versionName: String,
+    modifier: Modifier = Modifier
+) {
+    val (colorPalette, typography) = LocalAppearance.current
+    val labelStyle = typography.xxxl.bold.copy(
+        color = colorPalette.text,
+        fontFamily = FontFamily(Font(R.font.league_gothic))
+    )
+    val nameStyle = typography.xxl.bold.copy(color = colorPalette.accent)
+    val creditStyle = typography.xs.semiBold.copy(color = colorPalette.textDisabled)
+
+    Row(
+        verticalAlignment = Alignment.Top,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 8.dp)
+    ) {
+        BasicText(
+            text = "v$versionName",
+            style = labelStyle,
+            modifier = Modifier.padding(start = 16.dp)
+        )
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        Column(
+            horizontalAlignment = Alignment.End,
+            modifier = Modifier.widthIn(min = 120.dp)
+        ) {
+            BasicText(
+                text = "YeahAkis",
+                style = nameStyle,
+                modifier = Modifier.align(Alignment.End)
+            )
+
+            Spacer(modifier = Modifier.height(2.dp))
+
+            BasicText(
+                text = "Huizengek & vfsfitvnm",
+                style = creditStyle.copy(textAlign = TextAlign.End),
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
     }
 }

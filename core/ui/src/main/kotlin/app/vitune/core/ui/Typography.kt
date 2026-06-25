@@ -18,6 +18,7 @@ import androidx.compose.ui.text.googlefonts.isAvailableOnDevice
 import androidx.compose.ui.unit.sp
 import kotlinx.parcelize.Parceler
 import kotlinx.parcelize.Parcelize
+import kotlinx.parcelize.WriteWith
 import kotlinx.parcelize.parcelableCreator
 
 @Parcelize
@@ -31,7 +32,9 @@ data class Typography(
     val s by lazy { style.copy(fontSize = 16.sp) }
     val m by lazy { style.copy(fontSize = 18.sp) }
     val l by lazy { style.copy(fontSize = 20.sp) }
+    val xl by lazy { style.copy(fontSize = 26.sp) }
     val xxl by lazy { style.copy(fontSize = 32.sp) }
+    val xxxl by lazy { style.copy(fontSize = 64.sp) }
 
     fun copy(color: Color) = Typography(
         style = style.copy(color = color),
@@ -58,7 +61,7 @@ data class Typography(
 
 @Parcelize
 data class SavedTypography(
-    val color: ParcelableColor,
+    val color: @WriteWith<ColorParceler> Color,
     val fontFamily: BuiltInFontFamily,
     val includeFontPadding: Boolean
 ) : Parcelable
