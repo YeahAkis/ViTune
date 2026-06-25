@@ -41,6 +41,7 @@ import app.vitune.android.utils.enqueue
 import app.vitune.android.utils.forcePlayAtIndex
 import app.vitune.android.utils.forcePlayFromBeginning
 import app.vitune.android.utils.playingSong
+import app.vitune.android.utils.withQueueLabel
 import app.vitune.compose.persist.persist
 import app.vitune.core.ui.Dimensions
 import app.vitune.core.ui.LocalAppearance
@@ -112,7 +113,9 @@ fun PipedPlaylistSongList(
                                 text = stringResource(R.string.enqueue),
                                 enabled = playlist?.videos?.isNotEmpty() == true,
                                 onClick = {
-                                    mediaItems?.let { binder?.player?.enqueue(it) }
+                                    mediaItems?.let {
+                                        binder?.player?.enqueue(it.withQueueLabel(playlist?.name))
+                                    }
                                 }
                             )
 
@@ -145,7 +148,12 @@ fun PipedPlaylistSongList(
                                 },
                                 onClick = {
                                     binder?.stopRadio()
-                                    mediaItems?.let { binder?.player?.forcePlayAtIndex(it, index) }
+                                    mediaItems?.let {
+                                        binder?.player?.forcePlayAtIndex(
+                                            it.withQueueLabel(playlist?.name),
+                                            index
+                                        )
+                                    }
                                 }
                             ),
                             isPlaying = playing && currentMediaId == song.id
@@ -170,7 +178,9 @@ fun PipedPlaylistSongList(
                         if (songs.isNotEmpty()) {
                             binder?.stopRadio()
                             binder?.player?.forcePlayFromBeginning(
-                                songs.shuffled().mapNotNull(Playlist.Video::asMediaItem)
+                                songs.shuffled()
+                                    .mapNotNull(Playlist.Video::asMediaItem)
+                                    .withQueueLabel(playlist?.name)
                             )
                         }
                     }

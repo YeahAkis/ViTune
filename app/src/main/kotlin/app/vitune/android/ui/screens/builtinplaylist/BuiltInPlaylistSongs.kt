@@ -43,6 +43,7 @@ import app.vitune.android.utils.enqueue
 import app.vitune.android.utils.forcePlayAtIndex
 import app.vitune.android.utils.forcePlayFromBeginning
 import app.vitune.android.utils.playingSong
+import app.vitune.android.utils.withQueueLabel
 import app.vitune.compose.persist.persistList
 import app.vitune.core.data.enums.BuiltInPlaylist
 import app.vitune.core.data.enums.SongSortBy
@@ -114,6 +115,16 @@ fun BuiltInPlaylistSongs(
     val lazyListState = rememberLazyListState()
 
     val (currentMediaId, playing) = playingSong(binder)
+    val queueLabel = when (builtInPlaylist) {
+        BuiltInPlaylist.Favorites -> stringResource(R.string.favorites)
+        BuiltInPlaylist.Offline -> stringResource(R.string.offline)
+        BuiltInPlaylist.Top -> stringResource(
+            R.string.format_my_top_playlist,
+            topListLength
+        )
+
+        BuiltInPlaylist.History -> stringResource(R.string.history)
+    }
 
     Box(modifier = modifier) {
         LazyColumn(
@@ -130,23 +141,16 @@ fun BuiltInPlaylistSongs(
                 contentType = 0
             ) {
                 Header(
-                    title = when (builtInPlaylist) {
-                        BuiltInPlaylist.Favorites -> stringResource(R.string.favorites)
-                        BuiltInPlaylist.Offline -> stringResource(R.string.offline)
-                        BuiltInPlaylist.Top -> stringResource(
-                            R.string.format_my_top_playlist,
-                            topListLength
-                        )
-
-                        BuiltInPlaylist.History -> stringResource(R.string.history)
-                    },
+                    title = queueLabel,
                     modifier = Modifier.padding(bottom = 8.dp)
                 ) {
                     SecondaryTextButton(
                         text = stringResource(R.string.enqueue),
                         enabled = songs.isNotEmpty(),
                         onClick = {
-                            binder?.player?.enqueue(songs.map(Song::asMediaItem))
+                            binder?.player?.enqueue(
+                                songs.map(Song::asMediaItem).withQueueLabel(queueLabel)
+                            )
                         }
                     )
 
@@ -214,7 +218,7 @@ fun BuiltInPlaylistSongs(
                             onClick = {
                                 binder?.stopRadio()
                                 binder?.player?.forcePlayAtIndex(
-                                    items = songs.map(Song::asMediaItem),
+                                    items = songs.map(Song::asMediaItem).withQueueLabel(queueLabel),
                                     index = index
                                 )
                             }
@@ -235,7 +239,7 @@ fun BuiltInPlaylistSongs(
                 if (songs.isEmpty()) return@FloatingActionsContainerWithScrollToTop
                 binder?.stopRadio()
                 binder?.player?.forcePlayFromBeginning(
-                    songs.shuffled().map(Song::asMediaItem)
+                    songs.shuffled().map(Song::asMediaItem).withQueueLabel(queueLabel)
                 )
             }
         )

@@ -11,6 +11,7 @@ import app.vitune.core.ui.utils.songBundle
 import kotlin.time.Duration
 
 private const val CUSTOM_QUEUE_KEY = "isFromCustomQueue"
+private const val QUEUE_LABEL_KEY = "queueLabel"
 
 val Player.currentWindow: Timeline.Window?
     get() = if (mediaItemCount == 0) null else currentTimeline[currentMediaItemIndex]
@@ -49,6 +50,26 @@ private fun MediaItem.withCustomQueueTag() = buildUpon()
             .build()
     )
     .build()
+
+fun MediaItem.withQueueLabel(queueLabel: String?) =
+    if (queueLabel.isNullOrBlank()) this
+    else buildUpon()
+        .setMediaMetadata(
+            androidx.media3.common.MediaMetadata.Builder()
+                .setTitle(mediaMetadata.title)
+                .setArtist(mediaMetadata.artist)
+                .setAlbumTitle(mediaMetadata.albumTitle)
+                .setArtworkUri(mediaMetadata.artworkUri)
+                .setExtras(
+                    Bundle(mediaMetadata.extras)
+                        .apply { putString(QUEUE_LABEL_KEY, queueLabel) }
+                )
+                .build()
+        )
+        .build()
+
+fun List<MediaItem>.withQueueLabel(queueLabel: String?) =
+    map { it.withQueueLabel(queueLabel) }
 
 private fun MediaItem.isCustomQueued() = mediaMetadata.extras?.getBoolean(CUSTOM_QUEUE_KEY) == true
 

@@ -64,6 +64,7 @@ import app.vitune.android.utils.forcePlayFromBeginning
 import app.vitune.android.utils.launchYouTubeMusic
 import app.vitune.android.utils.playingSong
 import app.vitune.android.utils.toast
+import app.vitune.android.utils.withQueueLabel
 import app.vitune.compose.reordering.animateItemPlacement
 import app.vitune.compose.reordering.draggedItem
 import app.vitune.compose.reordering.rememberReorderingState
@@ -173,7 +174,7 @@ fun LocalPlaylistSongs(
                                 text = stringResource(R.string.enqueue),
                                 enabled = songs.isNotEmpty(),
                                 onClick = {
-                                    binder?.player?.enqueue(mediaItems)
+                                    binder?.player?.enqueue(mediaItems.withQueueLabel(playlist.name))
                                 }
                             )
 
@@ -293,7 +294,10 @@ fun LocalPlaylistSongs(
                                 },
                             onClick = {
                                 binder?.stopRadio()
-                                binder?.player?.forcePlayAtIndex(mediaItems, index)
+                                binder?.player?.forcePlayAtIndex(
+                                    mediaItems.withQueueLabel(playlist.name),
+                                    index
+                                )
                             }
                         )
                             .animateItemPlacement(reorderingState)
@@ -326,7 +330,7 @@ fun LocalPlaylistSongs(
 
                 binder?.stopRadio()
                 binder?.player?.forcePlayFromBeginning(
-                    songs.shuffled().map { it.asMediaItem }
+                    songs.shuffled().map { it.asMediaItem }.withQueueLabel(playlist.name)
                 )
             }
         )

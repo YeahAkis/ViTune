@@ -124,6 +124,7 @@ import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.milliseconds
 
 private const val CUSTOM_QUEUE_KEY = "isFromCustomQueue"
+private const val QUEUE_LABEL_KEY = "queueLabel"
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -289,12 +290,25 @@ fun Queue(
     ) {
         val queueLabel by remember {
             derivedStateOf {
-                windows.getOrNull(mediaItemIndex)
-                    ?.mediaItem
-                    ?.mediaMetadata
-                    ?.albumTitle
-                    ?.toString()
-                    ?.takeIf { it.isNotBlank() }
+                windows.asSequence()
+                    .mapNotNull {
+                        it.mediaItem.mediaMetadata.extras
+                            ?.getString(QUEUE_LABEL_KEY)
+                            ?.takeIf(String::isNotBlank)
+                    }
+                    .firstOrNull()
+                    ?: playlistQueueWindows.firstOrNull()
+                        ?.mediaItem
+                        ?.mediaMetadata
+                        ?.albumTitle
+                        ?.toString()
+                        ?.takeIf { it.isNotBlank() }
+                    ?: windows.getOrNull(mediaItemIndex)
+                        ?.mediaItem
+                        ?.mediaMetadata
+                        ?.albumTitle
+                        ?.toString()
+                        ?.takeIf { it.isNotBlank() }
                     ?: if (binder.isLoadingRadio) "Radio" else "Queue"
             }
         }

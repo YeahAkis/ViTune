@@ -54,6 +54,7 @@ import app.vitune.android.utils.enqueue
 import app.vitune.android.utils.forcePlayAtIndex
 import app.vitune.android.utils.forcePlayFromBeginning
 import app.vitune.android.utils.playingSong
+import app.vitune.android.utils.withQueueLabel
 import app.vitune.compose.persist.persist
 import app.vitune.core.ui.Dimensions
 import app.vitune.core.ui.LocalAppearance
@@ -136,6 +137,7 @@ fun PlaylistSongList(
                 enabled = playlistPage?.songsPage?.items?.isNotEmpty() == true,
                 onClick = {
                     playlistPage?.songsPage?.items?.map(Innertube.SongItem::asMediaItem)
+                        ?.withQueueLabel(playlistPage?.title)
                         ?.let { mediaItems ->
                             binder?.player?.enqueue(mediaItems)
                         }
@@ -230,7 +232,10 @@ fun PlaylistSongList(
                                 },
                                 onClick = {
                                     binder?.stopRadio()
-                                    binder?.player?.forcePlayAtIndex(mediaItems, index)
+                                    binder?.player?.forcePlayAtIndex(
+                                        mediaItems.withQueueLabel(playlistPage?.title),
+                                        index
+                                    )
                                 }
                             ),
                         isPlaying = playing && currentMediaId == song.key
@@ -254,7 +259,9 @@ fun PlaylistSongList(
                         if (songs.isNotEmpty()) {
                             binder?.stopRadio()
                             binder?.player?.forcePlayFromBeginning(
-                                songs.shuffled().map(Innertube.SongItem::asMediaItem)
+                                songs.shuffled()
+                                    .map(Innertube.SongItem::asMediaItem)
+                                    .withQueueLabel(playlistPage?.title)
                             )
                         }
                     }
