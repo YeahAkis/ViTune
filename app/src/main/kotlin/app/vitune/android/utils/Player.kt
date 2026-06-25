@@ -43,7 +43,7 @@ private fun MediaItem.withCustomQueueTag() = buildUpon()
             .setAlbumTitle(mediaMetadata.albumTitle)
             .setArtworkUri(mediaMetadata.artworkUri)
             .setExtras(
-                (mediaMetadata.extras ?: Bundle())
+                Bundle(mediaMetadata.extras)
                     .apply { putBoolean(CUSTOM_QUEUE_KEY, true) }
             )
             .build()
@@ -96,6 +96,10 @@ fun Player.movePlaylistQueueItem(fromIndex: Int, toIndex: Int) {
 
 fun Player.removeCustomQueueItem(index: Int) {
     removeMediaItem(customQueueStartIndex() + index)
+}
+
+fun Player.removePlaylistQueueItem(index: Int) {
+    removeMediaItem(playlistQueueStartIndex() + index)
 }
 
 fun Player.playAtIndex(index: Int) {
@@ -190,14 +194,18 @@ fun Player.forceSeekToPrevious(
 fun Player.forceSeekToNext() =
     if (hasNextMediaItem()) seekToNext() else seekTo(0, C.TIME_UNSET)
 
-fun Player.addNext(mediaItem: MediaItem) = when (playbackState) {
-    Player.STATE_IDLE, Player.STATE_ENDED -> forcePlay(mediaItem.withCustomQueueTag())
-    else -> addMediaItem(customQueueStartIndex(), mediaItem.withCustomQueueTag())
+fun Player.addNext(mediaItem: MediaItem) {
+    when (playbackState) {
+        Player.STATE_IDLE, Player.STATE_ENDED -> forcePlay(mediaItem.withCustomQueueTag())
+        else -> addMediaItem(customQueueStartIndex(), mediaItem.withCustomQueueTag())
+    }
 }
 
-fun Player.enqueue(mediaItem: MediaItem) = when (playbackState) {
-    Player.STATE_IDLE, Player.STATE_ENDED -> forcePlay(mediaItem.withCustomQueueTag())
-    else -> addMediaItem(customQueueStartIndex() + customQueueCount(), mediaItem.withCustomQueueTag())
+fun Player.enqueue(mediaItem: MediaItem) {
+    when (playbackState) {
+        Player.STATE_IDLE, Player.STATE_ENDED -> forcePlay(mediaItem.withCustomQueueTag())
+        else -> addMediaItem(customQueueStartIndex() + customQueueCount(), mediaItem.withCustomQueueTag())
+    }
 }
 
 fun Player.enqueue(mediaItems: List<MediaItem>) = when (playbackState) {

@@ -94,6 +94,7 @@ import app.vitune.android.utils.medium
 import app.vitune.android.utils.onFirst
 import app.vitune.android.utils.playAtIndex
 import app.vitune.android.utils.removeCustomQueueItem
+import app.vitune.android.utils.removePlaylistQueueItem
 import app.vitune.android.utils.moveCustomQueueItem
 import app.vitune.android.utils.movePlaylistQueueItem
 import app.vitune.android.utils.semiBold
@@ -391,6 +392,7 @@ fun Queue(
                                     shouldBePlaying = shouldBePlaying,
                                     reorderingState = customQueueReorderingState,
                                     modifier = itemModifier,
+                                    swipeKey = "custom_${window.uid.hashCode()}",
                                     onClick = {
                                         binder.player.playAtIndex(window.firstPeriodIndex)
                                     },
@@ -453,10 +455,13 @@ fun Queue(
                                     shouldBePlaying = shouldBePlaying,
                                     reorderingState = playlistQueueReorderingState,
                                     modifier = itemModifier,
+                                    swipeKey = "playlist_${window.uid.hashCode()}",
                                     onClick = {
                                         binder.player.playAtIndex(window.firstPeriodIndex)
                                     },
-                                    onSwipeRemove = null,
+                                    onSwipeRemove = {
+                                        binder.player.removePlaylistQueueItem(i)
+                                    },
                                     onMenu = {
                                         BaseMediaItemMenu(
                                             onDismiss = { menuState.hide() },
@@ -814,6 +819,7 @@ private fun QueueSongItem(
     isPlayingThisMediaItem: Boolean,
     shouldBePlaying: Boolean,
     reorderingState: ReorderingState?,
+    swipeKey: Any = mediaItem.mediaId,
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
     onSwipeRemove: (() -> Unit)?,
@@ -863,7 +869,7 @@ private fun QueueSongItem(
                 var itemModifier = modifier.background(colorPalette.background1)
                 if (onSwipeRemove != null && PlayerPreferences.horizontalSwipeToRemoveItem && !isPlayingThisMediaItem) {
                     itemModifier = itemModifier.swipeToClose(
-                        key = mediaItem.mediaId,
+                        key = swipeKey,
                         delay = 100.milliseconds,
                         requireUnconsumed = true
                     ) {
