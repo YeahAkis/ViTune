@@ -494,13 +494,17 @@ fun Queue(
                             }
                         }
 
-                        item(
-                            key = "divider",
-                            contentType = { ContentType.Divider }
-                        ) {
-                            if (visibleSuggestions.isNotEmpty()) HorizontalDivider(
-                                modifier = Modifier.padding(start = 28.dp + Dimensions.thumbnails.song)
-                            )
+                        if (visibleSuggestions.isNotEmpty()) {
+                            item(
+                                key = "suggestions_header",
+                                contentType = { ContentType.Section }
+                            ) {
+                                QueueSectionHeader(
+                                    text = "Suggestions",
+                                    color = colorPalette.textDisabled,
+                                    style = typography.s.semiBold
+                                )
+                            }
                         }
 
                         items(
