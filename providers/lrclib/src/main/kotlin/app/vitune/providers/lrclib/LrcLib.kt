@@ -6,6 +6,7 @@ import app.vitune.providers.utils.runCatchingCancellable
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.UserAgent
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
@@ -25,6 +26,12 @@ private const val AGENT = "ViTune (https://github.com/25huizengek1/ViTune)"
 object LrcLib {
     private val client by lazy {
         HttpClient(CIO) {
+            install(HttpTimeout) {
+                requestTimeoutMillis = 5000
+                connectTimeoutMillis = 5000
+                socketTimeoutMillis = 5000
+            }
+
             install(ContentNegotiation) {
                 json(
                     Json {

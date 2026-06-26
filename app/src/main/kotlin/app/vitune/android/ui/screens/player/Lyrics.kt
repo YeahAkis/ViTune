@@ -78,6 +78,7 @@ import app.vitune.android.ui.components.themed.ValueSelectorDialogBody
 import app.vitune.android.ui.modifiers.verticalFadingEdge
 import app.vitune.android.utils.SynchronizedLyrics
 import app.vitune.android.utils.SynchronizedLyricsState
+import app.vitune.android.utils.bold
 import app.vitune.android.utils.center
 import app.vitune.android.utils.color
 import app.vitune.android.utils.isInPip
@@ -102,6 +103,7 @@ import kotlinx.collections.immutable.toImmutableList
 import kotlinx.collections.immutable.toImmutableMap
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.cancellable
@@ -206,37 +208,41 @@ fun Lyrics(
                             lyrics = null
                             error = false
 
-                            val fixed = currentLyrics?.fixed ?: Innertube
-                                .lyrics(NextBody(videoId = mediaId))
-                                ?.getOrNull()
-                                ?: LrcLib.bestLyrics(
+                            val fixed = async {
+                                currentLyrics?.fixed ?: Innertube
+                                    .lyrics(NextBody(videoId = mediaId))
+                                    ?.getOrNull()
+                                    ?: LrcLib.bestLyrics(
+                                        artist = artist,
+                                        title = title,
+                                        duration = duration.milliseconds,
+                                        album = album,
+                                        synced = false
+                                    )?.map { it?.text }?.getOrNull()
+                            }
+
+                            val synced = async {
+                                currentLyrics?.synced ?: LrcLib.bestLyrics(
                                     artist = artist,
                                     title = title,
                                     duration = duration.milliseconds,
-                                    album = album,
-                                    synced = false
-                                )?.map { it?.text }?.getOrNull()
-
-                            val synced = currentLyrics?.synced ?: LrcLib.bestLyrics(
-                                artist = artist,
-                                title = title,
-                                duration = duration.milliseconds,
-                                album = album
-                            )?.map { it?.text }?.getOrNull() ?: LrcLib.bestLyrics(
-                                artist = artist,
-                                title = title.split("(")[0].trim(),
-                                duration = duration.milliseconds,
-                                album = album
-                            )?.map { it?.text }?.getOrNull() ?: KuGou.lyrics(
-                                artist = artist,
-                                title = title,
-                                duration = duration / 1000
-                            )?.map { it?.value }?.getOrNull()
+                                    album = album
+                                )?.map { it?.text }?.getOrNull() ?: LrcLib.bestLyrics(
+                                    artist = artist,
+                                    title = title.split("(")[0].trim(),
+                                    duration = duration.milliseconds,
+                                    album = album
+                                )?.map { it?.text }?.getOrNull() ?: KuGou.lyrics(
+                                    artist = artist,
+                                    title = title,
+                                    duration = duration / 1000
+                                )?.map { it?.value }?.getOrNull()
+                            }
 
                             Lyrics(
                                 songId = mediaId,
-                                fixed = fixed.orEmpty(),
-                                synced = synced.orEmpty()
+                                fixed = fixed.await().orEmpty(),
+                                synced = synced.await().orEmpty()
                             ).also {
                                 ensureActive()
 
@@ -427,7 +433,7 @@ fun Lyrics(
                 if (synchronizedLyrics != null) LazyColumn(
                     state = lazyListState,
                     userScrollEnabled = false,
-                    horizontalAlignment = Alignment.CenterHorizontally,
+                    horizontalAlignment = Alignment.Start,
                     verticalArrangement = Arrangement.Center,
                     modifier = Modifier
                         .verticalFadingEdge()
@@ -450,10 +456,10 @@ fun Lyrics(
                             colorFilter = ColorFilter.tint(color),
                             modifier = Modifier
                                 .padding(vertical = 4.dp, horizontal = 32.dp)
-                                .size(typography.xs.fontSize.dp)
+                                .size(typography.m.fontSize.dp)
                         ) else BasicText(
                             text = sentence,
-                            style = typography.xs.center.medium.color(color),
+                            style = typography.m.bold.color(color),
                             modifier = Modifier.padding(vertical = 4.dp, horizontal = 32.dp)
                         )
                     }
@@ -463,7 +469,7 @@ fun Lyrics(
                 }
             } else BasicText(
                 text = lyrics?.fixed.orEmpty(),
-                style = typography.xs.center.medium.color(colorPalette.onOverlay),
+                style = typography.m.bold.color(colorPalette.onOverlay),
                 modifier = Modifier
                     .verticalFadingEdge()
                     .verticalScroll(rememberScrollState())
