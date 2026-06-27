@@ -67,12 +67,12 @@ import app.vitune.core.data.enums.PlaylistSortBy
 import app.vitune.core.data.enums.SongSortBy
 import app.vitune.core.data.enums.SortOrder
 import app.vitune.core.ui.utils.songBundle
+import app.vitune.providers.common.models.WordSyncedLyrics
 import io.ktor.http.Url
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import app.vitune.providers.common.models.WordSyncedLyrics
 import kotlinx.serialization.json.Json
 
 object DatabaseDependency {

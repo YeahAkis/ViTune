@@ -84,10 +84,10 @@ import app.vitune.android.ui.screens.settingsRoute
 import app.vitune.android.utils.DisposableListener
 import app.vitune.android.utils.KeyedCrossfade
 import app.vitune.android.utils.LocalMonetCompat
+import app.vitune.android.utils.NewPipeDownloader
 import app.vitune.android.utils.asMediaItem
 import app.vitune.android.utils.collectProvidedBitmapAsState
 import app.vitune.android.utils.forcePlay
-import app.vitune.android.utils.NewPipeDownloader
 import app.vitune.android.utils.intent
 import app.vitune.android.utils.invokeOnReady
 import app.vitune.android.utils.isInPip
@@ -115,7 +115,6 @@ import app.vitune.providers.innertube.Innertube
 import app.vitune.providers.innertube.models.bodies.BrowseBody
 import app.vitune.providers.innertube.requests.playlistPage
 import app.vitune.providers.innertube.requests.song
-import org.schabi.newpipe.extractor.NewPipe
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
@@ -139,6 +138,7 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.schabi.newpipe.extractor.NewPipe
 import java.io.File
 
 private const val TAG = "MainActivity"

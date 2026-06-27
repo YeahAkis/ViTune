@@ -26,10 +26,10 @@ import app.vitune.android.LocalPlayerServiceBinder
 import app.vitune.android.R
 import app.vitune.android.service.PlayerService
 import app.vitune.core.ui.utils.EqualizerIntentBundleAccessor
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 @JvmInline
 value class PlayerScope internal constructor(val player: Player)

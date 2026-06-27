@@ -20,7 +20,6 @@ import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
 import app.vitune.android.LocalPlayerServiceBinder
 import app.vitune.android.R
-import app.vitune.android.preferences.ExtractorMode
 import app.vitune.android.preferences.PlayerPreferences
 import app.vitune.android.service.PlayerService
 import app.vitune.android.ui.components.themed.SecondaryTextButton

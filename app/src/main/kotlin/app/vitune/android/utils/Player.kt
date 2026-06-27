@@ -1,11 +1,11 @@
 package app.vitune.android.utils
 
+import android.os.Bundle
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
-import android.os.Bundle
 import app.vitune.android.preferences.AppearancePreferences
 import app.vitune.core.ui.utils.songBundle
 import kotlin.time.Duration

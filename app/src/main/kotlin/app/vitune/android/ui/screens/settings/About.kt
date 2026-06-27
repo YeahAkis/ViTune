@@ -13,24 +13,22 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.Font
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationCompat
@@ -50,10 +48,10 @@ import app.vitune.android.ui.components.themed.CircularProgressIndicator
 import app.vitune.android.ui.components.themed.DefaultDialog
 import app.vitune.android.ui.components.themed.SecondaryTextButton
 import app.vitune.android.ui.screens.Route
-import app.vitune.android.utils.hasPermission
-import app.vitune.android.utils.pendingIntent
 import app.vitune.android.utils.bold
 import app.vitune.android.utils.center
+import app.vitune.android.utils.hasPermission
+import app.vitune.android.utils.pendingIntent
 import app.vitune.android.utils.semiBold
 import app.vitune.core.data.utils.Version
 import app.vitune.core.data.utils.version
@@ -63,10 +61,10 @@ import app.vitune.core.ui.utils.isCompositionLaunched
 import app.vitune.providers.github.GitHub
 import app.vitune.providers.github.models.Release
 import app.vitune.providers.github.requests.releases
-import kotlin.time.Duration
-import kotlin.time.toJavaDuration
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlin.time.Duration
+import kotlin.time.toJavaDuration
 
 private val VERSION_NAME = BuildConfig.VERSION_NAME.substringBeforeLast("-")
 private const val REPO_OWNER = "25huizengek1"

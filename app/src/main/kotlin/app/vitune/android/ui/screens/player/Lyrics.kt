@@ -64,7 +64,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.C
@@ -87,9 +86,9 @@ import app.vitune.android.ui.components.themed.TextFieldDialog
 import app.vitune.android.ui.components.themed.TextPlaceholder
 import app.vitune.android.ui.components.themed.ValueSelectorDialogBody
 import app.vitune.android.ui.modifiers.verticalFadingEdge
-import app.vitune.android.utils.WordSynchronizedLyrics
 import app.vitune.android.utils.SynchronizedLyrics
 import app.vitune.android.utils.SynchronizedLyricsState
+import app.vitune.android.utils.WordSynchronizedLyrics
 import app.vitune.android.utils.bold
 import app.vitune.android.utils.center
 import app.vitune.android.utils.color
