@@ -72,6 +72,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import app.vitune.providers.common.models.WordSyncedLyrics
+import kotlinx.serialization.json.Json
 
 object DatabaseDependency {
     private var _instance by mutableStateOf(buildDatabase())
@@ -89,7 +91,7 @@ object DatabaseDependency {
             From10To11Migration(),
             From14To15Migration(),
             From22To23Migration(),
-            From23To24Migration()
+            From23To24Migration(),
         )
         .build()
 
@@ -824,7 +826,7 @@ interface DatabaseAccessor {
         PipedSession::class
     ],
     views = [SortedSongPlaylistMap::class],
-    version = 30,
+    version = 31,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2),
@@ -851,7 +853,8 @@ interface DatabaseAccessor {
         AutoMigration(from = 26, to = 27),
         AutoMigration(from = 27, to = 28),
         AutoMigration(from = 28, to = 29),
-        AutoMigration(from = 29, to = 30)
+        AutoMigration(from = 29, to = 30),
+        AutoMigration(from = 30, to = 31)
     ]
 )
 @TypeConverters(Converters::class)
@@ -1091,10 +1094,16 @@ abstract class DatabaseInitializer protected constructor() : RoomDatabase() {
         override fun migrate(db: SupportSQLiteDatabase) =
             db.execSQL("ALTER TABLE Song ADD COLUMN loudnessBoost REAL")
     }
+
 }
 
 @TypeConverters
 object Converters {
+    private val json = Json {
+        ignoreUnknownKeys = true
+        explicitNulls = false
+    }
+
     @TypeConverter
     @OptIn(UnstableApi::class)
     fun mediaItemFromByteArray(value: ByteArray?): MediaItem? = value?.let { byteArray ->
@@ -1127,6 +1136,18 @@ object Converters {
 
     @TypeConverter
     fun stringToUrl(string: String) = Url(string)
+
+    @TypeConverter
+    fun wordSyncedLyricsFromString(value: String?): WordSyncedLyrics? = value?.let {
+        runCatching {
+            json.decodeFromString<WordSyncedLyrics>(it)
+        }.getOrNull()
+    }
+
+    @TypeConverter
+    fun wordSyncedLyricsToString(value: WordSyncedLyrics?): String? = value?.let {
+        json.encodeToString(it)
+    }
 }
 
 @Suppress("UnusedReceiverParameter")

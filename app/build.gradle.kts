@@ -190,6 +190,8 @@ dependencies {
     implementation(projects.compose.routing)
     implementation(projects.compose.reordering)
 
+    implementation(projects.providers.common)
+    implementation(projects.providers.binimum)
     implementation(fileTree(projectDir.resolve("vendor")))
 
     implementation(platform(libs.compose.bom))

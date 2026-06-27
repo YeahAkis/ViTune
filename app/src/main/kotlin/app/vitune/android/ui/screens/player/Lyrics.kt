@@ -6,7 +6,11 @@ import android.content.Intent
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -18,12 +22,16 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -46,14 +54,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.C
@@ -76,6 +87,7 @@ import app.vitune.android.ui.components.themed.TextFieldDialog
 import app.vitune.android.ui.components.themed.TextPlaceholder
 import app.vitune.android.ui.components.themed.ValueSelectorDialogBody
 import app.vitune.android.ui.modifiers.verticalFadingEdge
+import app.vitune.android.utils.WordSynchronizedLyrics
 import app.vitune.android.utils.SynchronizedLyrics
 import app.vitune.android.utils.SynchronizedLyricsState
 import app.vitune.android.utils.bold
@@ -90,6 +102,8 @@ import app.vitune.core.ui.onOverlay
 import app.vitune.core.ui.onOverlayShimmer
 import app.vitune.core.ui.overlay
 import app.vitune.core.ui.utils.dp
+import app.vitune.providers.binimum.Binimum
+import app.vitune.providers.common.models.WordSyncedLyrics
 import app.vitune.providers.innertube.Innertube
 import app.vitune.providers.innertube.models.bodies.NextBody
 import app.vitune.providers.innertube.requests.lyrics
@@ -103,11 +117,11 @@ import kotlinx.collections.immutable.toImmutableList
 import kotlinx.collections.immutable.toImmutableMap
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.cancellable
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
@@ -153,7 +167,8 @@ fun Lyrics(
     var lyrics by remember { mutableStateOf<Lyrics?>(null) }
 
     val showSynchronizedLyrics = remember(shouldShowSynchronizedLyrics, lyrics) {
-        shouldShowSynchronizedLyrics && lyrics?.synced?.isBlank() != true
+        shouldShowSynchronizedLyrics &&
+            (lyrics?.wordSynced != null || lyrics?.synced?.isBlank() != true)
     }
 
     var editing by remember(mediaId, shouldShowSynchronizedLyrics) { mutableStateOf(false) }
@@ -161,7 +176,8 @@ fun Lyrics(
     var error by remember(mediaId, shouldShowSynchronizedLyrics) { mutableStateOf(false) }
 
     val text = remember(lyrics, showSynchronizedLyrics) {
-        if (showSynchronizedLyrics) lyrics?.synced else lyrics?.fixed
+        if (showSynchronizedLyrics) lyrics?.wordSynced?.text ?: lyrics?.synced
+        else lyrics?.fixed ?: lyrics?.wordSynced?.text
     }
     var invalidLrc by remember(text) { mutableStateOf(false) }
 
@@ -173,7 +189,7 @@ fun Lyrics(
         }
     }
 
-    LaunchedEffect(mediaId, shouldShowSynchronizedLyrics) {
+    LaunchedEffect(mediaId, shouldUpdateLyrics) {
         runCatching {
             withContext(Dispatchers.IO) {
                 Database
@@ -181,11 +197,9 @@ fun Lyrics(
                     .distinctUntilChanged()
                     .cancellable()
                     .collect { currentLyrics ->
-                        if (
-                            !shouldUpdateLyrics ||
-                            (currentLyrics?.fixed != null && currentLyrics.synced != null)
-                        ) lyrics = currentLyrics
-                        else {
+                        if (!shouldUpdateLyrics || currentLyrics?.wordSyncedChecked != null) {
+                            lyrics = currentLyrics
+                        } else {
                             val mediaMetadata = currentMediaMetadataProvider()
                             var duration =
                                 withContext(Dispatchers.Main) { currentDurationProvider() }
@@ -205,59 +219,30 @@ fun Lyrics(
                                 else it
                             }
 
-                            lyrics = null
-                            error = false
+                            val resolvedLyrics = resolveLyrics(
+                                mediaId = mediaId,
+                                artist = artist,
+                                title = title,
+                                album = album,
+                                duration = duration,
+                                currentLyrics = currentLyrics
+                            )
 
-                            val fixed = async {
-                                currentLyrics?.fixed ?: Innertube
-                                    .lyrics(NextBody(videoId = mediaId))
-                                    ?.getOrNull()
-                                    ?: LrcLib.bestLyrics(
-                                        artist = artist,
-                                        title = title,
-                                        duration = duration.milliseconds,
-                                        album = album,
-                                        synced = false
-                                    )?.map { it?.text }?.getOrNull()
-                            }
+                            lyrics = resolvedLyrics
 
-                            val synced = async {
-                                currentLyrics?.synced ?: LrcLib.bestLyrics(
-                                    artist = artist,
-                                    title = title,
-                                    duration = duration.milliseconds,
-                                    album = album
-                                )?.map { it?.text }?.getOrNull() ?: LrcLib.bestLyrics(
-                                    artist = artist,
-                                    title = title.split("(")[0].trim(),
-                                    duration = duration.milliseconds,
-                                    album = album
-                                )?.map { it?.text }?.getOrNull() ?: KuGou.lyrics(
-                                    artist = artist,
-                                    title = title,
-                                    duration = duration / 1000
-                                )?.map { it?.value }?.getOrNull()
-                            }
+                            ensureActive()
 
-                            Lyrics(
-                                songId = mediaId,
-                                fixed = fixed.await().orEmpty(),
-                                synced = synced.await().orEmpty()
-                            ).also {
-                                ensureActive()
-
-                                transaction {
-                                    runCatching {
-                                        currentEnsureSongInserted()
-                                        Database.upsert(it)
-                                    }
+                            transaction {
+                                runCatching {
+                                    currentEnsureSongInserted()
+                                    Database.upsert(resolvedLyrics)
                                 }
                             }
                         }
 
                         error =
-                            (shouldShowSynchronizedLyrics && lyrics?.synced?.isBlank() == true) ||
-                            (!shouldShowSynchronizedLyrics && lyrics?.fixed?.isBlank() == true)
+                            (showSynchronizedLyrics && lyrics?.wordSynced == null && lyrics?.synced?.isBlank() == true) ||
+                                (!showSynchronizedLyrics && lyrics?.fixed?.isBlank() == true)
                     }
             }
         }.exceptionOrNull()?.let {
@@ -268,8 +253,10 @@ fun Lyrics(
 
     if (editing) TextFieldDialog(
         hintText = stringResource(R.string.enter_lyrics),
-        initialTextInput = (if (shouldShowSynchronizedLyrics) lyrics?.synced else lyrics?.fixed)
-            .orEmpty(),
+        initialTextInput = (
+            if (shouldShowSynchronizedLyrics) lyrics?.fixed ?: lyrics?.wordSynced?.text ?: lyrics?.synced
+            else lyrics?.fixed ?: lyrics?.wordSynced?.text
+            ).orEmpty(),
         singleLine = false,
         maxLines = 10,
         isTextInputValid = { true },
@@ -280,22 +267,26 @@ fun Lyrics(
                     currentEnsureSongInserted()
 
                     Database.upsert(
-                        if (shouldShowSynchronizedLyrics) Lyrics(
-                            songId = mediaId,
-                            fixed = lyrics?.fixed,
-                            synced = it
-                        ) else Lyrics(
-                            songId = mediaId,
-                            fixed = it,
-                            synced = lyrics?.synced
-                        )
+                        when {
+                            lyrics?.wordSynced != null -> lyrics!!.copy(fixed = it)
+                            shouldShowSynchronizedLyrics -> Lyrics(
+                                songId = mediaId,
+                                fixed = lyrics?.fixed,
+                                synced = it
+                            )
+                            else -> Lyrics(
+                                songId = mediaId,
+                                fixed = it,
+                                synced = lyrics?.synced
+                            )
+                        }
                     )
                 }
             }
         }
     )
 
-    if (picking && shouldShowSynchronizedLyrics) {
+    if (picking && shouldShowSynchronizedLyrics && lyrics?.wordSynced == null) {
         var query by rememberSaveable {
             mutableStateOf(
                 currentMediaMetadataProvider().title?.toString().orEmpty().let {
@@ -337,7 +328,7 @@ fun Lyrics(
             .background(colorPalette.overlay)
     ) {
         val animatedHeight by animateDpAsState(
-            targetValue = this.maxHeight, // `this` needed, thanks Android Lint!
+            targetValue = this.maxHeight,
             label = ""
         )
 
@@ -363,7 +354,7 @@ fun Lyrics(
         }
 
         AnimatedVisibility(
-            visible = !text.isNullOrBlank() && !error && invalidLrc && shouldShowSynchronizedLyrics,
+            visible = showSynchronizedLyrics && !error && invalidLrc,
             enter = slideInVertically { -it },
             exit = slideOutVertically { -it },
             modifier = Modifier.align(Alignment.TopCenter)
@@ -380,7 +371,7 @@ fun Lyrics(
             )
         }
 
-        val lyricsState = rememberSaveable(text) {
+        val lyricsState = rememberSaveable(lyrics?.synced) {
             val file = lyrics?.synced?.takeIf { it.isNotBlank() }?.let {
                 LrcParser.parse(it)?.toLrcFile()
             }
@@ -392,7 +383,11 @@ fun Lyrics(
         }
 
         val synchronizedLyrics = remember(lyricsState) {
-            invalidLrc = lyricsState.sentences == null
+            invalidLrc = showSynchronizedLyrics &&
+                lyrics?.wordSynced == null &&
+                lyrics?.synced?.isNotBlank() == true &&
+                lyricsState.sentences == null
+
             lyricsState.sentences?.let {
                 SynchronizedLyrics(it.toImmutableMap()) {
                     binder?.player?.let { player ->
@@ -409,63 +404,180 @@ fun Lyrics(
             label = ""
         ) { synchronized ->
             val lazyListState = rememberLazyListState()
-            if (synchronized) {
-                LaunchedEffect(synchronizedLyrics, density, animatedHeight) {
-                    val currentSynchronizedLyrics = synchronizedLyrics ?: return@LaunchedEffect
-                    val centerOffset = with(density) { (-animatedHeight / 3).roundToPx() }
-
-                    lazyListState.animateScrollToItem(
-                        index = currentSynchronizedLyrics.index + 1,
-                        scrollOffset = centerOffset
-                    )
-
-                    while (true) {
-                        delay(UPDATE_DELAY)
-                        if (!currentSynchronizedLyrics.update()) continue
-
-                        lazyListState.animateScrollToItem(
-                            index = currentSynchronizedLyrics.index + 1,
-                            scrollOffset = centerOffset
-                        )
+            val wordSyncedLyrics = remember(lyrics?.wordSynced) {
+                lyrics?.wordSynced?.let { wordSynced ->
+                    WordSynchronizedLyrics(wordSynced.lines.toImmutableList()) {
+                        binder?.player?.let { player ->
+                            player.currentPosition + UPDATE_DELAY - (lyrics?.startTime ?: 0L)
+                        } ?: 0L
                     }
                 }
+            }
 
-                if (synchronizedLyrics != null) LazyColumn(
-                    state = lazyListState,
-                    userScrollEnabled = false,
-                    horizontalAlignment = Alignment.Start,
-                    verticalArrangement = Arrangement.Center,
-                    modifier = Modifier
-                        .verticalFadingEdge()
-                        .fillMaxWidth()
-                ) {
-                    item(key = "header", contentType = 0) {
-                        Spacer(modifier = Modifier.height(maxHeight))
-                    }
-                    itemsIndexed(
-                        items = synchronizedLyrics.sentences.values.toImmutableList()
-                    ) { index, sentence ->
-                        val color by animateColorAsState(
-                            if (index == synchronizedLyrics.index) Color.White
-                            else colorPalette.textDisabled
-                        )
+            if (synchronized) {
+                when {
+                    wordSyncedLyrics != null -> {
+                        LaunchedEffect(wordSyncedLyrics, density, animatedHeight) {
+                            val currentWordSyncedLyrics = wordSyncedLyrics
+                            val centerOffset = with(density) { (-animatedHeight / 3).roundToPx() }
 
-                        if (sentence.isBlank()) Image(
-                            painter = painterResource(R.drawable.musical_notes),
-                            contentDescription = null,
-                            colorFilter = ColorFilter.tint(color),
+                            lazyListState.scrollToItem(
+                                index = currentWordSyncedLyrics.index + 1,
+                                scrollOffset = centerOffset
+                            )
+
+                            while (true) {
+                                delay(UPDATE_DELAY)
+                                if (!currentWordSyncedLyrics.update()) continue
+
+                                launch {
+                                    lazyListState.animateScrollToItem(
+                                        index = currentWordSyncedLyrics.index + 1,
+                                        scrollOffset = centerOffset
+                                    )
+                                }
+                            }
+                        }
+
+                        LazyColumn(
+                            state = lazyListState,
+                            userScrollEnabled = false,
+                            horizontalAlignment = Alignment.Start,
+                            verticalArrangement = Arrangement.Center,
                             modifier = Modifier
-                                .padding(vertical = 4.dp, horizontal = 32.dp)
-                                .size(typography.m.fontSize.dp)
-                        ) else BasicText(
-                            text = sentence,
-                            style = typography.m.bold.color(color),
-                            modifier = Modifier.padding(vertical = 4.dp, horizontal = 32.dp)
-                        )
+                                .verticalFadingEdge()
+                                .fillMaxWidth()
+                        ) {
+                            item(key = "header", contentType = 0) {
+                                Spacer(modifier = Modifier.height(maxHeight))
+                            }
+                            itemsIndexed(
+                                items = wordSyncedLyrics.lines
+                            ) { index, sentence ->
+                                if (sentence.text.isBlank()) Image(
+                                    painter = painterResource(R.drawable.musical_notes),
+                                    contentDescription = null,
+                                    colorFilter = ColorFilter.tint(
+                                        if (index == wordSyncedLyrics.index) Color.White
+                                        else colorPalette.textDisabled
+                                    ),
+                                    modifier = Modifier
+                                        .animateItem(
+                                            placementSpec = tween(
+                                                durationMillis = 250,
+                                                easing = FastOutSlowInEasing
+                                            )
+                                        )
+                                        .padding(vertical = 4.dp, horizontal = 32.dp)
+                                        .size(typography.m.fontSize.dp)
+                                ) else WordSyncedLine(
+                                    line = sentence,
+                                    position = wordSyncedLyrics.position,
+                                    activeColor = Color.White,
+                                    inactiveColor = colorPalette.textDisabled,
+                                    backgroundActiveColor = Color.White.copy(alpha = 0.7f),
+                                    backgroundInactiveColor = colorPalette.textDisabled.copy(alpha = 0.75f),
+                                    style = typography.m.bold,
+                                    modifier = Modifier
+                                        .animateItem(
+                                            placementSpec = tween(
+                                                durationMillis = 250,
+                                                easing = FastOutSlowInEasing
+                                            )
+                                        )
+                                        .padding(vertical = 4.dp, horizontal = 32.dp)
+                                )
+                            }
+                            item(key = "footer", contentType = 0) {
+                                Spacer(modifier = Modifier.height(maxHeight))
+                            }
+                        }
                     }
-                    item(key = "footer", contentType = 0) {
-                        Spacer(modifier = Modifier.height(maxHeight))
+
+                    synchronizedLyrics != null -> {
+                        LaunchedEffect(synchronizedLyrics, density, animatedHeight) {
+                            val currentSynchronizedLyrics = synchronizedLyrics
+                            val centerOffset = with(density) { (-animatedHeight / 3).roundToPx() }
+
+                            lazyListState.scrollToItem(
+                                index = currentSynchronizedLyrics.index + 1,
+                                scrollOffset = centerOffset
+                            )
+
+                            while (true) {
+                                delay(UPDATE_DELAY)
+                                if (!currentSynchronizedLyrics.update()) continue
+
+                                launch {
+                                    lazyListState.animateScrollToItem(
+                                        index = currentSynchronizedLyrics.index + 1,
+                                        scrollOffset = centerOffset
+                                    )
+                                }
+                            }
+                        }
+
+                        LazyColumn(
+                            state = lazyListState,
+                            userScrollEnabled = false,
+                            horizontalAlignment = Alignment.Start,
+                            verticalArrangement = Arrangement.Center,
+                            modifier = Modifier
+                                .verticalFadingEdge()
+                                .fillMaxWidth()
+                        ) {
+                            item(key = "header", contentType = 0) {
+                                Spacer(modifier = Modifier.height(maxHeight))
+                            }
+                            itemsIndexed(
+                                items = synchronizedLyrics.sentences.values.toImmutableList()
+                            ) { index, sentence ->
+                                val color by animateColorAsState(
+                                    if (index == synchronizedLyrics.index) Color.White
+                                    else colorPalette.textDisabled
+                                )
+
+                                if (sentence.isBlank()) Image(
+                                    painter = painterResource(R.drawable.musical_notes),
+                                    contentDescription = null,
+                                    colorFilter = ColorFilter.tint(color),
+                                    modifier = Modifier
+                                        .animateItem(
+                                            placementSpec = tween(
+                                                durationMillis = 250,
+                                                easing = FastOutSlowInEasing
+                                            )
+                                        )
+                                        .padding(vertical = 4.dp, horizontal = 32.dp)
+                                        .size(typography.m.fontSize.dp)
+                                ) else BasicText(
+                                    text = sentence,
+                                    style = typography.m.bold.color(color),
+                                    modifier = Modifier
+                                        .animateItem(
+                                            placementSpec = tween(
+                                                durationMillis = 250,
+                                                easing = FastOutSlowInEasing
+                                            )
+                                        )
+                                        .padding(vertical = 4.dp, horizontal = 32.dp)
+                                )
+                            }
+                            item(key = "footer", contentType = 0) {
+                                Spacer(modifier = Modifier.height(maxHeight))
+                            }
+                        }
                     }
+
+                    else -> BasicText(
+                        text = lyrics?.synced.orEmpty(),
+                        style = typography.m.bold.color(colorPalette.onOverlay),
+                        modifier = Modifier
+                            .verticalFadingEdge()
+                            .verticalScroll(rememberScrollState())
+                            .fillMaxWidth()
+                            .padding(vertical = maxHeight / 4, horizontal = 32.dp)
+                    )
                 }
             } else BasicText(
                 text = lyrics?.fixed.orEmpty(),
@@ -583,11 +695,15 @@ fun Lyrics(
                                                         if (shouldShowSynchronizedLyrics) Lyrics(
                                                             songId = mediaId,
                                                             fixed = lyrics?.fixed,
-                                                            synced = null
+                                                            synced = null,
+                                                            wordSynced = null,
+                                                            wordSyncedChecked = null
                                                         ) else Lyrics(
                                                             songId = mediaId,
                                                             fixed = null,
-                                                            synced = lyrics?.synced
+                                                            synced = lyrics?.synced,
+                                                            wordSynced = null,
+                                                            wordSyncedChecked = null
                                                         )
                                                     )
                                                 }
@@ -595,7 +711,7 @@ fun Lyrics(
                                         }
                                     )
 
-                                    if (shouldShowSynchronizedLyrics) {
+                                    if (shouldShowSynchronizedLyrics && lyrics?.wordSynced == null) {
                                         MenuEntry(
                                             icon = R.drawable.download,
                                             text = stringResource(R.string.pick_from_lrclib),
@@ -628,6 +744,64 @@ fun Lyrics(
                     .padding(all = 8.dp)
                     .size(20.dp)
                     .align(Alignment.BottomEnd)
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun WordSyncedLine(
+    line: WordSyncedLyrics.Line,
+    position: Long,
+    activeColor: Color,
+    inactiveColor: Color,
+    backgroundActiveColor: Color,
+    backgroundInactiveColor: Color,
+    style: androidx.compose.ui.text.TextStyle,
+    modifier: Modifier = Modifier
+) = FlowRow(
+    modifier = modifier,
+    horizontalArrangement = Arrangement.spacedBy(0.dp)
+) {
+    line.words.forEach { word ->
+        val rawProgress = when {
+            position <= word.begin -> 0f
+            position >= word.end -> 1f
+            word.end <= word.begin -> 1f
+            else -> ((position - word.begin).toFloat() / (word.end - word.begin).toFloat())
+                .coerceIn(0f, 1f)
+        }
+
+        val fillProgress by animateFloatAsState(
+            targetValue = rawProgress,
+            animationSpec = tween(durationMillis = UPDATE_DELAY.toInt(), easing = LinearEasing),
+            label = "wordFill"
+        )
+
+        val isActive = position in word.begin..word.end
+        val lift by animateDpAsState(
+            targetValue = if (isActive) (-3).dp else 0.dp,
+            animationSpec = tween(durationMillis = 150),
+            label = "wordLift"
+        )
+
+        val (inactive, active) = if (word.background) backgroundInactiveColor to backgroundActiveColor
+        else inactiveColor to activeColor
+
+        Box(modifier = Modifier.offset(y = lift)) {
+            BasicText(
+                text = word.text + word.separator,
+                style = style.copy(color = inactive)
+            )
+            BasicText(
+                text = word.text + word.separator,
+                style = style.copy(color = active),
+                modifier = Modifier.drawWithContent {
+                    clipRect(right = size.width * fillProgress) {
+                        this@drawWithContent.drawContent()
+                    }
+                }
             )
         }
     }
@@ -717,3 +891,115 @@ fun LrcLibSearchDialog(
         )
     }
 }
+
+private suspend fun resolveLyrics(
+    mediaId: String,
+    artist: String,
+    title: String,
+    album: String?,
+    duration: Long,
+    currentLyrics: Lyrics?
+): Lyrics {
+    val base = currentLyrics ?: Lyrics(
+        songId = mediaId,
+        fixed = null,
+        synced = null
+    )
+
+    if (base.wordSyncedChecked == null) {
+        Binimum.lyrics(
+            artist = artist,
+            title = title,
+            duration = duration.milliseconds,
+            album = album
+        )?.getOrNull()?.let { wordSynced ->
+            return base.copy(
+                fixed = wordSynced.text,
+                synced = null,
+                wordSynced = wordSynced,
+                wordSyncedChecked = true
+            )
+        }
+    }
+
+    val cached = base.copy(wordSyncedChecked = false)
+
+    cached.synced?.let { synced ->
+        if (synced.isNotBlank()) return cached.copy(
+            fixed = cached.fixed ?: synced.toPlainLyrics() ?: cached.fixed,
+            synced = synced
+        )
+
+        if (cached.fixed != null) return cached.copy(synced = synced)
+    }
+
+    val synced = fetchSyncedLyrics(
+        artist = artist,
+        title = title,
+        duration = duration,
+        album = album
+    )
+
+    if (synced != null) {
+        return cached.copy(
+            fixed = synced.toPlainLyrics() ?: cached.fixed ?: synced,
+            synced = synced
+        )
+    }
+
+    cached.fixed?.takeIf { it.isNotBlank() }?.let { fixed ->
+        return cached.copy(fixed = fixed, synced = "")
+    }
+
+    return cached.copy(
+        fixed = fetchFixedLyrics(
+            mediaId = mediaId,
+            artist = artist,
+            title = title,
+            duration = duration,
+            album = album
+        ) ?: "",
+        synced = ""
+    )
+}
+
+private suspend fun fetchSyncedLyrics(
+    artist: String,
+    title: String,
+    duration: Long,
+    album: String?
+): String? = LrcLib.bestLyrics(
+    artist = artist,
+    title = title,
+    duration = duration.milliseconds,
+    album = album
+)?.map { it?.text }?.getOrNull()
+    ?: LrcLib.bestLyrics(
+        artist = artist,
+        title = title.split("(")[0].trim(),
+        duration = duration.milliseconds,
+        album = album
+    )?.map { it?.text }?.getOrNull()
+    ?: KuGou.lyrics(
+        artist = artist,
+        title = title,
+        duration = duration / 1000
+    )?.map { it?.value }?.getOrNull()
+
+private suspend fun fetchFixedLyrics(
+    mediaId: String,
+    artist: String,
+    title: String,
+    duration: Long,
+    album: String?
+): String? = Innertube.lyrics(NextBody(videoId = mediaId))
+    ?.getOrNull()
+    ?: LrcLib.bestLyrics(
+        artist = artist,
+        title = title,
+        duration = duration.milliseconds,
+        album = album,
+        synced = false
+    )?.map { it?.text }?.getOrNull()
+
+private fun String.toPlainLyrics() = LrcParser.parse(this)?.toLrcFile()?.lines?.values?.joinToString("\n")

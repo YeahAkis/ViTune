@@ -4,6 +4,7 @@ import androidx.compose.runtime.Immutable
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.PrimaryKey
+import app.vitune.providers.common.models.WordSyncedLyrics
 
 @Immutable
 @Entity(
@@ -20,5 +21,7 @@ data class Lyrics(
     @PrimaryKey val songId: String,
     val fixed: String?,
     val synced: String?,
+    val wordSynced: WordSyncedLyrics? = null,
+    val wordSyncedChecked: Boolean? = null,
     val startTime: Long? = null
 )
