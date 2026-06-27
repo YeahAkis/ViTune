@@ -798,7 +798,7 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
                             }
 
                             if (posMillis().milliseconds !in nextSegment.start..nextSegment.end) {
-                                // Player is not in the segment for some reason, maybe the user seeked in the meantime
+                                // Player is not in the segment for some reason, maybe the user sought in the meantime
                                 yield()
                                 continue
                             }
@@ -1410,7 +1410,7 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
 
                     this.subrange(start, length).withAdditionalHeaders(headers)
                 } ?: meta?.let {
-                    // contentLength is null but we still have a UA to forward
+                    // contentLength is null, but we still have a UA to forward
                     this.withAdditionalHeaders(mapOf("User-Agent" to effectiveUA))
                 } ?: this // local file or other non-YouTube source: leave untouched
             }
