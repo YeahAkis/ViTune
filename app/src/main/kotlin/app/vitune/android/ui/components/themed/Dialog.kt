@@ -31,6 +31,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
@@ -245,7 +246,8 @@ fun <T> ValueSelectorDialog(
     values: ImmutableList<T>,
     onValueSelect: (T) -> Unit,
     modifier: Modifier = Modifier,
-    valueText: @Composable (T) -> String = { it.toString() }
+    valueText: @Composable (T) -> String = { it.toString() },
+    isValueEnabled: (T) -> Boolean = { true }
 ) = Dialog(onDismissRequest = onDismiss) {
     ValueSelectorDialogBody(
         onDismiss = onDismiss,
@@ -260,7 +262,8 @@ fun <T> ValueSelectorDialog(
                 shape = 8.dp.roundedShape
             )
             .padding(vertical = 16.dp),
-        valueText = valueText
+        valueText = valueText,
+        isValueEnabled = isValueEnabled
     )
 }
 
@@ -272,7 +275,8 @@ fun <T> ValueSelectorDialogBody(
     values: ImmutableList<T>,
     onValueSelect: (T) -> Unit,
     modifier: Modifier = Modifier,
-    valueText: @Composable (T) -> String = { it.toString() }
+    valueText: @Composable (T) -> String = { it.toString() },
+    isValueEnabled: (T) -> Boolean = { true }
 ) = Column(modifier = modifier) {
     val (colorPalette, typography) = LocalAppearance.current
 
@@ -284,16 +288,20 @@ fun <T> ValueSelectorDialogBody(
 
     Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
         values.forEach { value ->
+            val enabled = isValueEnabled(value)
+
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 modifier = Modifier
                     .clickable(
+                        enabled = enabled,
                         onClick = {
                             onDismiss()
                             onValueSelect(value)
                         }
                     )
+                    .alpha(if (enabled) 1f else 0.5f)
                     .padding(vertical = 12.dp, horizontal = 24.dp)
                     .fillMaxWidth()
             ) {

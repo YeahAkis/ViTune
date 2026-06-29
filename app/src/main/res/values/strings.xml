@@ -380,4 +380,7 @@
         <item quantity="one">%1$d song</item>
         <item quantity="other">%1$d songs</item>
     </plurals>
+    <string name="extractor">Extractor</string>
+    <string name="extractor_description">Currently: %1$s - leave at NewPipe if you don\'t know what you\'re doing</string>
+    <string name="extractor_innertube_broken">InnerTube (broken)</string>
 </resources>

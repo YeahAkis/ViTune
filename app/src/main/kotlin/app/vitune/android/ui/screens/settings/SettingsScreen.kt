@@ -106,18 +106,22 @@ inline fun <reified T : Enum<T>> EnumValueSelectorSettingsEntry(
     selectedValue: T,
     noinline onValueSelect: (T) -> Unit,
     modifier: Modifier = Modifier,
+    text: String? = null,
     isEnabled: Boolean = true,
     noinline valueText: @Composable (T) -> String = { it.name },
-    noinline trailingContent: (@Composable () -> Unit)? = null
+    noinline trailingContent: (@Composable () -> Unit)? = null,
+    noinline isValueEnabled: (T) -> Boolean = { true }
 ) = ValueSelectorSettingsEntry(
     title = title,
     selectedValue = selectedValue,
     values = enumValues<T>().toList().toImmutableList(),
     onValueSelect = onValueSelect,
     modifier = modifier,
+    text = text,
     isEnabled = isEnabled,
     valueText = valueText,
-    trailingContent = trailingContent
+    trailingContent = trailingContent,
+    isValueEnabled = isValueEnabled
 )
 
 @Composable
@@ -131,7 +135,8 @@ fun <T> ValueSelectorSettingsEntry(
     isEnabled: Boolean = true,
     usePadding: Boolean = true,
     valueText: @Composable (T) -> String = { it.toString() },
-    trailingContent: (@Composable () -> Unit)? = null
+    trailingContent: (@Composable () -> Unit)? = null,
+    isValueEnabled: (T) -> Boolean = { true }
 ) {
     var isShowingDialog by remember { mutableStateOf(false) }
 
@@ -141,7 +146,8 @@ fun <T> ValueSelectorSettingsEntry(
         selectedValue = selectedValue,
         values = values,
         onValueSelect = onValueSelect,
-        valueText = valueText
+        valueText = valueText,
+        isValueEnabled = isValueEnabled
     )
 
     SettingsEntry(
