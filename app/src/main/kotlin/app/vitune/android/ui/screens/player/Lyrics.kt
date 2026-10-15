@@ -559,13 +559,18 @@ fun Lyrics(
         }
 
         if (text == null && !error) Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.shimmer()
+            horizontalAlignment = Alignment.Start,
+            modifier = Modifier
+                .shimmer()
+                .fillMaxWidth()
+                .padding(horizontal = 32.dp)
         ) {
-            repeat(4) {
+            listOf(0.9f, 0.7f, 0.85f, 0.55f, 0.8f, 0.65f, 0.75f).forEachIndexed { index, width ->
                 TextPlaceholder(
                     color = colorPalette.onOverlayShimmer,
-                    modifier = Modifier.alpha(1f - it * 0.2f)
+                    width = width,
+                    height = 26.dp,
+                    modifier = Modifier.alpha(1f - index * 0.1f)
                 )
             }
         }
