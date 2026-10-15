@@ -1347,7 +1347,7 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
     companion object {
         private const val DEFAULT_CACHE_DIRECTORY = "exoplayer"
         private const val DEFAULT_CHUNK_LENGTH = 512 * 1024L
-        private const val PREFETCH_LOOKAHEAD = 2
+        private const val PREFETCH_LOOKAHEAD = 5
 
         fun createDatabaseProvider(context: Context) = StandaloneDatabaseProvider(context)
         fun createCache(
