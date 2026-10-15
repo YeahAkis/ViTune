@@ -66,7 +66,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.media3.common.C
 import androidx.media3.common.MediaMetadata
 import app.vitune.android.Database
 import app.vitune.android.LocalPlayerServiceBinder
@@ -86,6 +85,7 @@ import app.vitune.android.ui.components.themed.TextFieldDialog
 import app.vitune.android.ui.components.themed.TextPlaceholder
 import app.vitune.android.ui.components.themed.ValueSelectorDialogBody
 import app.vitune.android.ui.modifiers.verticalFadingEdge
+import app.vitune.android.utils.LyricsFetcher
 import app.vitune.android.utils.SynchronizedLyrics
 import app.vitune.android.utils.SynchronizedLyricsState
 import app.vitune.android.utils.WordSynchronizedLyrics
@@ -101,12 +101,7 @@ import app.vitune.core.ui.onOverlay
 import app.vitune.core.ui.onOverlayShimmer
 import app.vitune.core.ui.overlay
 import app.vitune.core.ui.utils.dp
-import app.vitune.providers.binimum.Binimum
 import app.vitune.providers.common.models.WordSyncedLyrics
-import app.vitune.providers.innertube.Innertube
-import app.vitune.providers.innertube.models.bodies.NextBody
-import app.vitune.providers.innertube.requests.lyrics
-import app.vitune.providers.kugou.KuGou
 import app.vitune.providers.lrclib.LrcLib
 import app.vitune.providers.lrclib.LrcParser
 import app.vitune.providers.lrclib.models.Track
@@ -199,44 +194,18 @@ fun Lyrics(
                         if (!shouldUpdateLyrics || currentLyrics?.wordSyncedChecked != null) {
                             lyrics = currentLyrics
                         } else {
-                            val mediaMetadata = currentMediaMetadataProvider()
-                            var duration =
-                                withContext(Dispatchers.Main) { currentDurationProvider() }
-
-                            while (duration == C.TIME_UNSET) {
-                                delay(100)
-                                duration =
-                                    withContext(Dispatchers.Main) { currentDurationProvider() }
-                            }
-
-                            val album = mediaMetadata.albumTitle?.toString()
-                            val artist = mediaMetadata.artist?.toString().orEmpty()
-                            val title = mediaMetadata.title?.toString().orEmpty().let {
-                                if (mediaId.startsWith(LOCAL_KEY_PREFIX)) it
-                                    .substringBeforeLast('.')
-                                    .trim()
-                                else it
-                            }
-
-                            val resolvedLyrics = resolveLyrics(
+                            val resolvedLyrics = LyricsFetcher.ensure(
                                 mediaId = mediaId,
-                                artist = artist,
-                                title = title,
-                                album = album,
-                                duration = duration,
-                                currentLyrics = currentLyrics
+                                mediaMetadata = currentMediaMetadataProvider(),
+                                ensureSongInserted = currentEnsureSongInserted,
+                                playerDuration = {
+                                    withContext(Dispatchers.Main) { currentDurationProvider() }
+                                }
                             )
-
-                            lyrics = resolvedLyrics
 
                             ensureActive()
 
-                            transaction {
-                                runCatching {
-                                    currentEnsureSongInserted()
-                                    Database.upsert(resolvedLyrics)
-                                }
-                            }
+                            if (resolvedLyrics != null) lyrics = resolvedLyrics
                         }
 
                         error =
@@ -890,115 +859,3 @@ fun LrcLibSearchDialog(
         )
     }
 }
-
-private suspend fun resolveLyrics(
-    mediaId: String,
-    artist: String,
-    title: String,
-    album: String?,
-    duration: Long,
-    currentLyrics: Lyrics?
-): Lyrics {
-    val base = currentLyrics ?: Lyrics(
-        songId = mediaId,
-        fixed = null,
-        synced = null
-    )
-
-    if (base.wordSyncedChecked == null) {
-        Binimum.lyrics(
-            artist = artist,
-            title = title,
-            duration = duration.milliseconds,
-            album = album
-        )?.getOrNull()?.let { wordSynced ->
-            return base.copy(
-                fixed = wordSynced.text,
-                synced = null,
-                wordSynced = wordSynced,
-                wordSyncedChecked = true
-            )
-        }
-    }
-
-    val cached = base.copy(wordSyncedChecked = false)
-
-    cached.synced?.let { synced ->
-        if (synced.isNotBlank()) return cached.copy(
-            fixed = cached.fixed ?: synced.toPlainLyrics() ?: cached.fixed,
-            synced = synced
-        )
-
-        if (cached.fixed != null) return cached.copy(synced = synced)
-    }
-
-    val synced = fetchSyncedLyrics(
-        artist = artist,
-        title = title,
-        duration = duration,
-        album = album
-    )
-
-    if (synced != null) {
-        return cached.copy(
-            fixed = synced.toPlainLyrics() ?: cached.fixed ?: synced,
-            synced = synced
-        )
-    }
-
-    cached.fixed?.takeIf { it.isNotBlank() }?.let { fixed ->
-        return cached.copy(fixed = fixed, synced = "")
-    }
-
-    return cached.copy(
-        fixed = fetchFixedLyrics(
-            mediaId = mediaId,
-            artist = artist,
-            title = title,
-            duration = duration,
-            album = album
-        ) ?: "",
-        synced = ""
-    )
-}
-
-private suspend fun fetchSyncedLyrics(
-    artist: String,
-    title: String,
-    duration: Long,
-    album: String?
-): String? = LrcLib.bestLyrics(
-    artist = artist,
-    title = title,
-    duration = duration.milliseconds,
-    album = album
-)?.map { it?.text }?.getOrNull()
-    ?: LrcLib.bestLyrics(
-        artist = artist,
-        title = title.split("(")[0].trim(),
-        duration = duration.milliseconds,
-        album = album
-    )?.map { it?.text }?.getOrNull()
-    ?: KuGou.lyrics(
-        artist = artist,
-        title = title,
-        duration = duration / 1000
-    )?.map { it?.value }?.getOrNull()
-
-private suspend fun fetchFixedLyrics(
-    mediaId: String,
-    artist: String,
-    title: String,
-    duration: Long,
-    album: String?
-): String? = Innertube.lyrics(NextBody(videoId = mediaId))
-    ?.getOrNull()
-    ?: LrcLib.bestLyrics(
-        artist = artist,
-        title = title,
-        duration = duration.milliseconds,
-        album = album,
-        synced = false
-    )?.map { it?.text }?.getOrNull()
-
-private fun String.toPlainLyrics() = LrcParser.parse(this)?.toLrcFile()?.lines?.values?.joinToString("\n")
