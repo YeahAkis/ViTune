@@ -25,7 +25,7 @@ android {
         minSdk = 24
         targetSdk = 37
 
-        versionCode = System.getenv("ANDROID_VERSION_CODE")?.toIntOrNull() ?: 23
+        versionCode = System.getenv("ANDROID_VERSION_CODE")?.toIntOrNull() ?: 25
         versionName = project.version.toString()
 
         multiDexEnabled = true
@@ -153,7 +153,6 @@ kotlin {
         languageVersion.set(KotlinVersion.KOTLIN_2_5)
 
         freeCompilerArgs.addAll(
-            "-Xcontext-parameters",
             "-Xconsistent-data-class-copy-visibility"
         )
     }
@@ -175,8 +174,8 @@ chaquopy {
     defaultConfig {
         version = "3.14"
         pip {
-            install("yt-dlp>=2026.06.09")
-            install("yt-dlp-ejs")
+            install("yt-dlp>=2026.08.19")
+            install("yt-dlp-ejs>=0.8.0")
             install("pip")
         }
     }
@@ -243,7 +242,4 @@ dependencies {
     implementation(projects.core.ui)
 
     implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.3")
-
-    detektPlugins(libs.detekt.compose)
-    detektPlugins(libs.detekt.formatting)
 }

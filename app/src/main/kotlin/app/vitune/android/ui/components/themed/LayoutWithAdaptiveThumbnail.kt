@@ -52,7 +52,7 @@ fun adaptiveThumbnailContent(
         contentAlignment = Alignment.Center,
         modifier = modifier.padding(horizontal = 8.dp, vertical = 16.dp)
     ) {
-        val (colorPalette, _, _, thumbnailShape) = LocalAppearance.current
+        val [colorPalette, _, _, thumbnailShape] = LocalAppearance.current
         val thumbnailSize =
             if (isLandscape) (maxHeight - 96.dp - Dimensions.items.collapsedPlayerHeight)
             else maxWidth

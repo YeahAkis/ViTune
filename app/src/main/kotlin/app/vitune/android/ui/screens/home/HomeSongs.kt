@@ -5,7 +5,6 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
@@ -110,7 +109,6 @@ fun HomeSongs(
     )
 }
 
-@kotlin.OptIn(ExperimentalFoundationApi::class)
 @OptIn(UnstableApi::class)
 @Route
 @Composable
@@ -123,7 +121,7 @@ fun HomeSongs(
     setSortOrder: (SortOrder) -> Unit,
     title: String
 ) {
-    val (colorPalette, typography, _, thumbnailShape) = LocalAppearance.current
+    val [colorPalette, typography, _, thumbnailShape] = LocalAppearance.current
 
     val binder = LocalPlayerServiceBinder.current
     val menuState = LocalMenuState.current
@@ -149,7 +147,7 @@ fun HomeSongs(
 
     val lazyListState = rememberLazyListState()
 
-    val (currentMediaId, playing) = playingSong(binder)
+    val [currentMediaId, playing] = playingSong(binder)
 
     Box(
         modifier = Modifier

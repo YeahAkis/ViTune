@@ -68,6 +68,7 @@ def upgrade(package_name):
     global _ydl
     try:
         import ensurepip
+
         ensurepip.bootstrap()
     except Exception as e:
         print(f"Error running ensurepip: {e}")

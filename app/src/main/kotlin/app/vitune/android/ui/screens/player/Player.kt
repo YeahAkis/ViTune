@@ -117,7 +117,7 @@ fun Player(
     windowInsets: WindowInsets = WindowInsets.systemBars
 ) = with(PlayerPreferences) {
     val menuState = LocalMenuState.current
-    val (colorPalette, typography, thumbnailCornerSize) = LocalAppearance.current
+    val [colorPalette, typography, thumbnailCornerSize] = LocalAppearance.current
     val binder = LocalPlayerServiceBinder.current
 
     val pipHandler = rememberPipHandler()

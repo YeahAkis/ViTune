@@ -15,6 +15,8 @@ import io.ktor.client.call.body
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 
+private const val RELATED_PREFIX = "MPTRt"
+
 suspend fun Innertube.relatedPage(body: NextBody) = runCatchingCancellable {
     val nextResponse = client.post(NEXT) {
         setBody(body.copy(context = Context.DefaultWebNoLang))
@@ -24,17 +26,24 @@ suspend fun Innertube.relatedPage(body: NextBody) = runCatchingCancellable {
         )
     }.body<NextResponse>()
 
-    val browseId = nextResponse
+    val tabs = nextResponse
         .contents
         ?.singleColumnMusicWatchNextResultsRenderer
         ?.tabbedRenderer
         ?.watchNextTabbedResultsRenderer
         ?.tabs
-        ?.getOrNull(2)
-        ?.tabRenderer
+        ?.mapNotNull { it.tabRenderer }
+
+    val browseId = tabs
+        ?.firstOrNull { it.endpoint?.browseEndpoint?.browseId?.startsWith(RELATED_PREFIX) == true }
         ?.endpoint
         ?.browseEndpoint
         ?.browseId
+        ?: tabs
+            ?.lastOrNull { it.endpoint?.browseEndpoint?.browseId != null }
+            ?.endpoint
+            ?.browseEndpoint
+            ?.browseId
         ?: return@runCatchingCancellable null
 
     val response = client.post(BROWSE) {

@@ -20,7 +20,7 @@ fun PlaylistInfo(
     otherInfo: String?,
     modifier: Modifier = Modifier
 ) {
-    val (_, typography) = LocalAppearance.current
+    val [_, typography] = LocalAppearance.current
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,

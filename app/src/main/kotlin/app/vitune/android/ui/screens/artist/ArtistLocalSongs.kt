@@ -1,6 +1,5 @@
 package app.vitune.android.ui.screens.artist
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
@@ -42,7 +41,6 @@ import app.vitune.core.ui.Dimensions
 import app.vitune.core.ui.LocalAppearance
 import app.vitune.core.ui.utils.isLandscape
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ArtistLocalSongs(
     browseId: String,
@@ -62,7 +60,7 @@ fun ArtistLocalSongs(
 
     val lazyListState = rememberLazyListState()
 
-    val (currentMediaId, playing) = playingSong(binder)
+    val [currentMediaId, playing] = playingSong(binder)
 
     LayoutWithAdaptiveThumbnail(
         thumbnailContent = thumbnailContent,

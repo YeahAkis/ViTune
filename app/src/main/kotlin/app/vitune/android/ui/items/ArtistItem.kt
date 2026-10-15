@@ -69,7 +69,7 @@ fun ArtistItem(
     horizontalAlignment = Alignment.CenterHorizontally,
     modifier = Modifier.clip(LocalAppearance.current.thumbnailShape) then modifier
 ) {
-    val (_, typography) = LocalAppearance.current
+    val [_, typography] = LocalAppearance.current
 
     AsyncImage(
         model = thumbnailUrl?.thumbnail(thumbnailSize.px),

@@ -96,10 +96,10 @@ fun HomePlaylists(
     LaunchedEffect(Unit) {
         Database.pipedSessions().collect { sessions ->
             pipedSessions = sessions.associateWith { session ->
-                async {
+                this@LaunchedEffect.async {
                     Piped.playlist.list(session = session.toApiSession())?.getOrNull()
                 }
-            }.mapValues { (_, value) -> value.await() }
+            }.mapValues { [_, value] -> value.await() }
         }
     }
 
@@ -255,7 +255,7 @@ fun HomePlaylists(
             pipedSessions
                 ?.ifEmpty { null }
                 ?.filter { it.value?.isNotEmpty() == true }
-                ?.forEach { (session, playlists) ->
+                ?.forEach { [session, playlists] ->
                     item(
                         key = "piped-header-${session.username}",
                         contentType = 0,

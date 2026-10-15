@@ -34,7 +34,7 @@ fun Attribution(
     text: String,
     modifier: Modifier = Modifier
 ) = Column {
-    val (_, typography) = LocalAppearance.current
+    val [_, typography] = LocalAppearance.current
     val windowInsets = LocalPlayerAwareWindowInsets.current
 
     val endPaddingValues = windowInsets

@@ -27,17 +27,8 @@ dependencies {
     implementation(libs.compose.ui.fonts)
     implementation(libs.compose.material3)
     implementation(libs.palette)
-
-    detektPlugins(libs.detekt.compose)
-    detektPlugins(libs.detekt.formatting)
 }
 
 kotlin {
     jvmToolchain(libs.versions.jvm.get().toInt())
-
-    compilerOptions {
-        freeCompilerArgs.addAll(
-            "-Xcontext-parameters"
-        )
-    }
 }

@@ -63,6 +63,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 import kotlin.system.exitProcess
+import kotlin.time.Duration.Companion.milliseconds
 
 @SuppressLint("BatteryLife")
 @Route
@@ -332,7 +333,7 @@ fun OtherSettings() {
                         context.findActivity().finishAndRemoveTask()
                         binder?.restartForegroundOrStop()
                         troubleshootScope.launch {
-                            delay(500L)
+                            delay(500L.milliseconds)
                             Handler(Looper.getMainLooper()).postAtFrontOfQueue { exitProcess(0) }
                         }
                     },
@@ -360,7 +361,7 @@ fun OtherSettings() {
                 text = stringResource(R.string.show_troubleshoot_section),
                 onClick = {
                     coroutineScope.launch {
-                        delay(500)
+                        delay(500.milliseconds)
                         scrollState.smoothScrollToBottom()
                     }
                     showTroubleshoot = true

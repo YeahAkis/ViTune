@@ -15,12 +15,6 @@ android {
 
 kotlin {
     jvmToolchain(libs.versions.jvm.get().toInt())
-
-    compilerOptions {
-        freeCompilerArgs.addAll(
-            "-Xcontext-parameters"
-        )
-    }
 }
 
 dependencies {
@@ -28,7 +22,4 @@ dependencies {
     implementation(libs.compose.activity)
     implementation(libs.compose.foundation)
     implementation(libs.compose.animation)
-
-    detektPlugins(libs.detekt.compose)
-    detektPlugins(libs.detekt.formatting)
 }

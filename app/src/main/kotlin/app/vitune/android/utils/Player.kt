@@ -29,8 +29,9 @@ fun Player.removeMediaItems(range: IntRange) = removeMediaItems(range.first, ran
 
 fun Player.safeClearQueue() {
     if (currentMediaItemIndex > 0) removeMediaItems(0 until currentMediaItemIndex)
-    if (currentMediaItemIndex < mediaItemCount - 1)
+    if (currentMediaItemIndex < mediaItemCount - 1) {
         removeMediaItems(currentMediaItemIndex + 1 until mediaItemCount)
+    }
 }
 
 fun Player.seamlessPlay(mediaItem: MediaItem) =
@@ -173,43 +174,51 @@ fun Player.forcePlayAtIndex(
 
 fun Player.forcePlayFromBeginning(items: List<MediaItem>) = forcePlayAtIndex(items, 0)
 
+@Suppress("NestedBlockDepth") // TODO
 fun Player.forceSeekToPrevious(
     hideExplicit: Boolean = AppearancePreferences.hideExplicit,
     seekToStart: Boolean = true
-): Unit {
-    when {
-        seekToStart && currentPosition > maxSeekToPreviousPosition -> seekToPrevious()
-        currentMediaItem?.isCustomQueued() == true -> if (hideExplicit) {
-            if (mediaItemCount <= 1) forceSeekToPrevious(hideExplicit = false)
-            else {
-                var i = currentMediaItemIndex - 1
-                while (
-                    i !in (0 until mediaItemCount) ||
-                    getMediaItemAt(i).mediaMetadata.extras?.songBundle?.explicit == true
-                ) {
-                    if (i <= 0) i = mediaItemCount - 1 else i--
-                }
-                seekTo(i, C.TIME_UNSET)
-            }
-        } else {
-            if (hasPreviousMediaItem()) seekToPreviousMediaItem()
-            else if (mediaItemCount > 0) seekTo(currentMediaItemIndex, C.TIME_UNSET)
-        }
+): Unit = when {
+    seekToStart && currentPosition > maxSeekToPreviousPosition -> seekToPrevious()
 
-        else -> {
+    currentMediaItem?.isCustomQueued() == true -> if (hideExplicit) {
+        if (mediaItemCount <= 1) forceSeekToPrevious(hideExplicit = false)
+        else {
             var i = currentMediaItemIndex - 1
             while (
-                i >= 0 &&
-                hideExplicit &&
+                i !in (0 until mediaItemCount) ||
                 getMediaItemAt(i).mediaMetadata.extras?.songBundle?.explicit == true
-            ) i--
-
-            when {
-                i >= 0 -> seekTo(i, C.TIME_UNSET)
-                mediaItemCount > 0 -> seekTo(currentMediaItemIndex, C.TIME_UNSET)
+            ) {
+                if (i <= 0) i = mediaItemCount - 1 else i--
             }
+            seekTo(i, C.TIME_UNSET)
         }
+    } else {
+        if (hasPreviousMediaItem()) seekToPreviousMediaItem()
+        else if (mediaItemCount > 0) seekTo(currentMediaItemIndex, C.TIME_UNSET)
+        else Unit
     }
+
+    hideExplicit -> if (mediaItemCount <= 1) {
+        forceSeekToPrevious(hideExplicit = false)
+    } else {
+        var i = currentMediaItemIndex - 1
+        while (
+            i !in (0 until mediaItemCount) ||
+            getMediaItemAt(i).mediaMetadata.extras?.songBundle?.explicit == true
+        ) {
+            if (i <= 0) i = mediaItemCount - 1 else i--
+        }
+        seekTo(i, C.TIME_UNSET)
+    }
+
+    // fall back to default behavior if there is only a single song
+
+    hasPreviousMediaItem() -> seekToPreviousMediaItem()
+
+    mediaItemCount > 0 -> seekTo(mediaItemCount - 1, C.TIME_UNSET)
+
+    else -> {}
 }
 
 fun Player.forceSeekToNext() =

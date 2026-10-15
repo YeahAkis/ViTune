@@ -1,6 +1,5 @@
 package app.vitune.android.ui.screens.home
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -76,7 +75,6 @@ import app.vitune.providers.innertube.models.bodies.NextBody
 import app.vitune.providers.innertube.requests.relatedPage
 import kotlinx.coroutines.flow.distinctUntilChanged
 
-@OptIn(ExperimentalFoundationApi::class)
 @Route
 @Composable
 fun QuickPicks(
@@ -143,7 +141,7 @@ fun QuickPicks(
         .padding(top = 24.dp, bottom = 8.dp)
         .padding(endPaddingValues)
 
-    val (currentMediaId, playing) = playingSong(binder)
+    val [currentMediaId, playing] = playingSong(binder)
 
     BoxWithConstraints {
         val quickPicksLazyGridItemWidthFactor =

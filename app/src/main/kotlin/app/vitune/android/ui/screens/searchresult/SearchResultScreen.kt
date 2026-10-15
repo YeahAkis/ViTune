@@ -1,6 +1,5 @@
 package app.vitune.android.ui.screens.searchresult
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -45,7 +44,6 @@ import app.vitune.providers.innertube.models.bodies.SearchBody
 import app.vitune.providers.innertube.requests.searchPage
 import app.vitune.providers.innertube.utils.from
 
-@OptIn(ExperimentalFoundationApi::class)
 @Route
 @Composable
 fun SearchResultScreen(query: String, onSearchAgain: () -> Unit) {
@@ -57,7 +55,7 @@ fun SearchResultScreen(query: String, onSearchAgain: () -> Unit) {
 
     PersistMapCleanup(prefix = "searchResults/$query/")
 
-    val (currentMediaId, playing) = playingSong(binder)
+    val [currentMediaId, playing] = playingSong(binder)
 
     RouteHandler {
         GlobalRoutes()

@@ -34,9 +34,9 @@ fun SearchScreen(
 ) {
     val saveableStateHolder = rememberSaveableStateHolder()
 
-    val (tabIndex, onTabChanged) = rememberSaveable { mutableIntStateOf(0) }
+    val [tabIndex, onTabChanged] = rememberSaveable { mutableIntStateOf(0) }
 
-    val (textFieldValue, onTextFieldValueChanged) = rememberSaveable(
+    val [textFieldValue, onTextFieldValueChanged] = rememberSaveable(
         initialTextInput,
         stateSaver = TextFieldValue.Saver
     ) {

@@ -1,6 +1,5 @@
 package app.vitune.android.ui.screens.pipedplaylist
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
@@ -55,7 +54,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.UUID
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun PipedPlaylistSongList(
     session: Session,
@@ -87,7 +85,7 @@ fun PipedPlaylistSongList(
         url = playlist?.thumbnailUrl?.toString()
     )
 
-    val (currentMediaId, playing) = playingSong(binder)
+    val [currentMediaId, playing] = playingSong(binder)
 
     LayoutWithAdaptiveThumbnail(
         thumbnailContent = thumbnailContent,

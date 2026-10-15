@@ -205,15 +205,19 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
             }
         ).addCustomAction(
             PlaybackState.CustomAction.Builder(
-                /* action = */ LIKE_ACTION,
-                /* name   = */ getString(R.string.like),
+                /* action = */
+                LIKE_ACTION,
+                /* name   = */
+                getString(R.string.like),
                 /* icon   = */
                 if (isLikedState.value) R.drawable.heart else R.drawable.heart_outline
             ).build()
         ).addCustomAction(
             PlaybackState.CustomAction.Builder(
-                /* action = */ LOOP_ACTION,
-                /* name   = */ getString(R.string.queue_loop),
+                /* action = */
+                LOOP_ACTION,
+                /* name   = */
+                getString(R.string.queue_loop),
                 /* icon   = */
                 if (PlayerPreferences.trackLoopEnabled) R.drawable.repeat_on else R.drawable.repeat
             ).build()
@@ -300,11 +304,13 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_LOCAL)
             .setAudioAttributes(
-                /* audioAttributes = */ AudioAttributes.Builder()
+                /* audioAttributes = */
+                AudioAttributes.Builder()
                     .setUsage(C.USAGE_MEDIA)
                     .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
                     .build(),
-                /* handleAudioFocus = */ PlayerPreferences.handleAudioFocus
+                /* handleAudioFocus = */
+                PlayerPreferences.handleAudioFocus
             )
             .setUsePlatformDiagnostics(false)
             .build()
@@ -313,8 +319,10 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
                 addListener(this@PlayerService)
                 addAnalyticsListener(
                     PlaybackStatsListener(
-                        /* keepHistory = */ false,
-                        /* callback = */ this@PlayerService
+                        /* keepHistory = */
+                        false,
+                        /* callback = */
+                        this@PlayerService
                     )
                 )
             }
@@ -390,7 +398,6 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
                 val min = when {
                     audioManager == null -> 0
                     isAtLeastAndroid9 -> audioManager.getStreamMinVolume(stream)
-
                     else -> 0
                 }
 
@@ -410,8 +417,9 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        if (!player.shouldBePlaying || PlayerPreferences.stopWhenClosed)
+        if (!player.shouldBePlaying || PlayerPreferences.stopWhenClosed) {
             broadcastPendingIntent<NotificationDismissReceiver>().send()
+        }
         super.onTaskRemoved(rootIntent)
     }
 
@@ -462,21 +470,25 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
 
         val mediaItem = eventTime.timeline[eventTime.windowIndex].mediaItem
 
-        if (!DataPreferences.pausePlaytime) query {
-            runCatching {
-                Database.incrementTotalPlayTimeMs(mediaItem.mediaId, totalPlayTimeMs)
+        if (!DataPreferences.pausePlaytime) {
+            query {
+                runCatching {
+                    Database.incrementTotalPlayTimeMs(mediaItem.mediaId, totalPlayTimeMs)
+                }
             }
         }
 
-        if (!DataPreferences.pauseHistory) query {
-            runCatching {
-                Database.insert(
-                    Event(
-                        songId = mediaItem.mediaId,
-                        timestamp = System.currentTimeMillis(),
-                        playTime = totalPlayTimeMs
+        if (!DataPreferences.pauseHistory) {
+            query {
+                runCatching {
+                    Database.insert(
+                        Event(
+                            songId = mediaItem.mediaId,
+                            timestamp = System.currentTimeMillis(),
+                            playTime = totalPlayTimeMs
+                        )
                     )
-                )
+                }
             }
         }
     }
@@ -504,8 +516,9 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
             }
         }
 
-        if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO || reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK)
+        if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO || reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK) {
             updateMediaSessionQueue(player.currentTimeline)
+        }
     }
 
     override fun onTimelineChanged(timeline: Timeline, reason: Int) {
@@ -546,38 +559,20 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
         }
     }
 
-    private fun updateMediaSessionQueue(timeline: Timeline) {
-        val builder = MediaDescription.Builder()
-
-        val currentMediaItemIndex = player.currentMediaItemIndex
-        val lastIndex = timeline.windowCount - 1
-        var startIndex = currentMediaItemIndex - 7
-        var endIndex = currentMediaItemIndex + 7
-
-        if (startIndex < 0) endIndex -= startIndex
-
-        if (endIndex > lastIndex) {
-            startIndex -= (endIndex - lastIndex)
-            endIndex = lastIndex
+    private fun updateMediaSessionQueue(timeline: Timeline) = mediaSession.setQueue(
+        List(timeline.windowCount) { index ->
+            val mediaItem = timeline.getWindow(index, Timeline.Window()).mediaItem
+            MediaSession.QueueItem(
+                MediaDescription.Builder()
+                    .setMediaId(mediaItem.mediaId)
+                    .setTitle(mediaItem.mediaMetadata.title)
+                    .setSubtitle(mediaItem.mediaMetadata.artist)
+                    .setIconUri(mediaItem.mediaMetadata.artworkUri)
+                    .build(),
+                index.toLong()
+            )
         }
-
-        startIndex = startIndex.coerceAtLeast(0)
-
-        mediaSession.setQueue(
-            List(endIndex - startIndex + 1) { index ->
-                val mediaItem = timeline.getWindow(index + startIndex, Timeline.Window()).mediaItem
-                MediaSession.QueueItem(
-                    builder
-                        .setMediaId(mediaItem.mediaId)
-                        .setTitle(mediaItem.mediaMetadata.title)
-                        .setSubtitle(mediaItem.mediaMetadata.artist)
-                        .setIconUri(mediaItem.mediaMetadata.artworkUri)
-                        .build(),
-                    (index + startIndex).toLong()
-                )
-            }
-        )
-    }
+    )
 
     private fun maybeRecoverPlaybackError() {
         if (player.playerError != null) player.prepare()
@@ -668,7 +663,8 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
             handler.post {
                 runCatching {
                     player.setMediaItems(
-                        /* mediaItems = */ queue.map { item ->
+                        /* mediaItems = */
+                        queue.map { item ->
                             item.mediaItem.buildUpon()
                                 .setUri(item.mediaItem.mediaId)
                                 .setCustomCacheKey(item.mediaItem.mediaId)
@@ -679,8 +675,10 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
                                     }
                                 }
                         },
-                        /* startIndex = */ index,
-                        /* startPositionMs = */ queue[index].position ?: C.TIME_UNSET
+                        /* startIndex = */
+                        index,
+                        /* startPositionMs = */
+                        queue[index].position ?: C.TIME_UNSET
                     )
                     player.prepare()
 
@@ -726,7 +724,9 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
                             }
 
                             0
-                        } else it
+                        } else {
+                            it
+                        }
                     }
 
                     Database.loudnessBoost(songId).cancellable().collectLatest { boost ->
@@ -859,8 +859,11 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
     }
 
     private fun maybeShowSongCoverInLockScreen() = handler.post {
-        val bitmap = if (isAtLeastAndroid13 || AppearancePreferences.isShowingThumbnailInLockscreen)
-            bitmapProvider.bitmap else null
+        val bitmap = if (isAtLeastAndroid13 || AppearancePreferences.isShowingThumbnailInLockscreen) {
+            bitmapProvider.bitmap
+        } else {
+            null
+        }
         val uri = player.mediaMetadata.artworkUri?.toString()?.thumbnail(512)
 
         metadataBuilder.putBitmap(MediaMetadata.METADATA_KEY_ART, bitmap)
@@ -869,10 +872,12 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
         metadataBuilder.putBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART, bitmap)
         metadataBuilder.putString(MediaMetadata.METADATA_KEY_ALBUM_ART_URI, uri)
 
-        if (isAtLeastAndroid13 && player.currentMediaItemIndex == 0) metadataBuilder.putText(
-            MediaMetadata.METADATA_KEY_TITLE,
-            "${player.mediaMetadata.title} "
-        )
+        if (isAtLeastAndroid13 && player.currentMediaItemIndex == 0) {
+            metadataBuilder.putText(
+                MediaMetadata.METADATA_KEY_TITLE,
+                "${player.mediaMetadata.title} "
+            )
+        }
 
         mediaSession.setMetadata(metadataBuilder.build())
     }
@@ -895,8 +900,11 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
                         audioDeviceInfo.type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES
                     )
                     .let {
-                        if (!isAtLeastAndroid8) it else
+                        if (!isAtLeastAndroid8) {
+                            it
+                        } else {
                             it || audioDeviceInfo.type == AudioDeviceInfo.TYPE_USB_HEADSET
+                        }
                     }
 
             override fun onAudioDevicesAdded(addedDevices: Array<AudioDeviceInfo>) {
@@ -920,6 +928,7 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
             withContext(Dispatchers.Main) {
                 mediaSession.setPlaybackState(
                     stateBuilder
+                        .setActiveQueueItemId(player.currentMediaItemIndex.toLong())
                         .setState(
                             player.androidPlaybackState,
                             player.currentPosition,
@@ -945,23 +954,25 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
     // legacy behavior may cause inconsistencies, but not available on sdk 24 or lower
     @Suppress("DEPRECATION")
     override fun onEvents(player: Player, events: Player.Events) {
-        if (player.duration != C.TIME_UNSET) mediaSession.setMetadata(
-            metadataBuilder
-                .putText(
-                    MediaMetadata.METADATA_KEY_TITLE,
-                    player.mediaMetadata.title?.toString().orEmpty()
-                )
-                .putText(
-                    MediaMetadata.METADATA_KEY_ARTIST,
-                    player.mediaMetadata.artist?.toString().orEmpty()
-                )
-                .putText(
-                    MediaMetadata.METADATA_KEY_ALBUM,
-                    player.mediaMetadata.albumTitle?.toString().orEmpty()
-                )
-                .putLong(MediaMetadata.METADATA_KEY_DURATION, player.duration)
-                .build()
-        )
+        if (player.duration != C.TIME_UNSET) {
+            mediaSession.setMetadata(
+                metadataBuilder
+                    .putText(
+                        MediaMetadata.METADATA_KEY_TITLE,
+                        player.mediaMetadata.title?.toString().orEmpty()
+                    )
+                    .putText(
+                        MediaMetadata.METADATA_KEY_ARTIST,
+                        player.mediaMetadata.artist?.toString().orEmpty()
+                    )
+                    .putText(
+                        MediaMetadata.METADATA_KEY_ALBUM,
+                        player.mediaMetadata.albumTitle?.toString().orEmpty()
+                    )
+                    .putLong(MediaMetadata.METADATA_KEY_DURATION, player.duration)
+                    .build()
+            )
+        }
 
         updatePlaybackState()
 
@@ -974,7 +985,9 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
                 Player.EVENT_IS_LOADING_CHANGED,
                 Player.EVENT_MEDIA_METADATA_CHANGED
             )
-        ) return
+        ) {
+            return
+        }
 
         val notification = notification()
 
@@ -1015,6 +1028,7 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
         }
 
         return {
+            @Suppress("DEPRECATION")
             this
                 .setContentTitle(mediaMetadata.title?.toString().orEmpty())
                 .setContentText(mediaMetadata.artist?.toString().orEmpty())
@@ -1039,16 +1053,19 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
                     notificationActionReceiver.previous.pendingIntent
                 )
                 .let {
-                    if (player.shouldBePlaying) it.addAction(
-                        R.drawable.pause,
-                        getString(R.string.pause),
-                        notificationActionReceiver.pause.pendingIntent
-                    )
-                    else it.addAction(
-                        R.drawable.play,
-                        getString(R.string.play),
-                        notificationActionReceiver.play.pendingIntent
-                    )
+                    if (player.shouldBePlaying) {
+                        it.addAction(
+                            R.drawable.pause,
+                            getString(R.string.pause),
+                            notificationActionReceiver.pause.pendingIntent
+                        )
+                    } else {
+                        it.addAction(
+                            R.drawable.play,
+                            getString(R.string.play),
+                            notificationActionReceiver.play.pendingIntent
+                        )
+                    }
                 }
                 .addAction(
                     R.drawable.play_skip_forward,
@@ -1087,7 +1104,8 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
     private val streamUriCache = UriCache<String, StreamMeta?>()
 
     private fun createMediaSourceFactory() = DefaultMediaSourceFactory(
-        /* dataSourceFactory = */ createYouTubeDataSourceResolverFactory(
+        /* dataSourceFactory = */
+        createYouTubeDataSourceResolverFactory(
             findMediaItem = { videoId ->
                 withContext(Dispatchers.Main) {
                     player.findNextMediaItemById(videoId)
@@ -1097,7 +1115,8 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
             cache = cache,
             uriCache = streamUriCache
         ),
-        /* extractorsFactory = */ DefaultExtractorsFactory()
+        /* extractorsFactory = */
+        DefaultExtractorsFactory()
     ).setLoadErrorHandlingPolicy(
         object : DefaultLoadErrorHandlingPolicy() {
             override fun isEligibleForFallback(exception: IOException) = true
@@ -1124,11 +1143,16 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
                     DefaultAudioProcessorChain(
                         arrayOf(),
                         SilenceSkippingAudioProcessor(
-                            /* minimumSilenceDurationUs = */ minimumSilenceDuration,
-                            /* silenceRetentionRatio = */ 0.01f,
-                            /* maxSilenceToKeepDurationUs = */ minimumSilenceDuration,
-                            /* minVolumeToKeepPercentageWhenMuting = */ 0,
-                            /* silenceThresholdLevel = */ 256
+                            /* minimumSilenceDurationUs = */
+                            minimumSilenceDuration,
+                            /* silenceRetentionRatio = */
+                            0.01f,
+                            /* maxSilenceToKeepDurationUs = */
+                            minimumSilenceDuration,
+                            /* minVolumeToKeepPercentageWhenMuting = */
+                            0,
+                            /* silenceThresholdLevel = */
+                            256
                         ),
                         SonicAudioProcessor()
                     )

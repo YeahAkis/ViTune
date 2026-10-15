@@ -38,7 +38,7 @@ object BuiltInPlaylistScreen {
 @Composable
 fun BuiltInPlaylistScreen(builtInPlaylist: BuiltInPlaylist) {
     val saveableStateHolder = rememberSaveableStateHolder()
-    val (tabIndex, onTabIndexChanged) = rememberSaveable { mutableIntStateOf(builtInPlaylist.ordinal) }
+    val [tabIndex, onTabIndexChanged] = rememberSaveable { mutableIntStateOf(builtInPlaylist.ordinal) }
 
     PersistMapCleanup(prefix = "${builtInPlaylist.name}/")
 

@@ -89,9 +89,9 @@ fun Thumbnail(
     showLyricsControls: Boolean = true
 ) {
     val binder = LocalPlayerServiceBinder.current
-    val (colorPalette, _, _, thumbnailShape) = LocalAppearance.current
+    val [colorPalette, _, _, thumbnailShape] = LocalAppearance.current
 
-    val (window, error) = windowState()
+    val [window, error] = windowState()
 
     val coroutineScope = rememberCoroutineScope()
     val transitionState = remember { SeekableTransitionState(false) }
@@ -252,11 +252,14 @@ fun Thumbnail(
                             stringResource(R.string.error_network)
 
                         is PlayableFormatNotFoundException -> stringResource(R.string.error_unplayable)
+
                         is UnplayableException -> stringResource(R.string.error_source_deleted)
+
                         is LoginRequiredException, is RestrictedVideoException ->
                             stringResource(R.string.error_server_restrictions)
 
                         is VideoIdMismatchException -> stringResource(R.string.error_id_mismatch)
+
                         else -> stringResource(R.string.error_unknown_playback)
                     }
                 },

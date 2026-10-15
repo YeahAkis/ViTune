@@ -66,7 +66,7 @@ abstract class NotificationChannels {
             handler.post {
                 val manager = context.notificationManager
                 upsertChannel(context)
-                val (id, notif) = createNotification(context, notification)
+                val [id, notif] = createNotification(context, notification)
                 manager.notify(id, notif)
             }
         }
@@ -78,7 +78,7 @@ abstract class NotificationChannels {
         ) = runCatching {
             val start = {
                 upsertChannel(context)
-                val (id, notif) = createNotification(context, notification)
+                val [id, notif] = createNotification(context, notification)
                 s.startForeground(id, notif)
             }
 

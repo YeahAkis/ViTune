@@ -98,7 +98,7 @@ fun MoreMoodsList(
         }
 
         data?.let { page ->
-            if (page.isNotEmpty()) page.fastForEachIndexed { i, (title, moods) ->
+            if (page.isNotEmpty()) page.fastForEachIndexed { i, [title, moods] ->
                 item(
                     key = "header:$i,$title",
                     contentType = 0,

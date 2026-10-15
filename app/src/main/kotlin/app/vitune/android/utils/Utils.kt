@@ -145,19 +145,20 @@ val Duration.formatted
         }
     }
 
-fun String?.thumbnail(
+fun String.thumbnail(
     size: Int,
     maxSize: Int = AppearancePreferences.maxThumbnailSize
-): String? {
+): String {
     val actualSize = size.coerceAtMost(maxSize)
     return when {
-        this?.startsWith("https://lh3.googleusercontent.com") == true -> "$this-w$actualSize-h$actualSize"
-        this?.startsWith("https://yt3.ggpht.com") == true -> "$this-w$actualSize-h$actualSize-s$actualSize"
+        this.startsWith("https://lh3.googleusercontent.com") ||
+            this.startsWith("https://yt3.googleusercontent.com") -> "$this-w$actualSize-h$actualSize"
+        this.startsWith("https://yt3.ggpht.com") -> "$this-w$actualSize-h$actualSize-s$actualSize"
         else -> this
     }
 }
 
-fun Uri?.thumbnail(size: Int) = toString().thumbnail(size)?.toUri()
+fun Uri.thumbnail(size: Int) = toString().thumbnail(size).toUri()
 
 fun formatAsDuration(millis: Long) = DateUtils.formatElapsedTime(millis / 1000).removePrefix("0")
 

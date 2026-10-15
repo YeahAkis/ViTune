@@ -256,7 +256,7 @@ fun PlaylistItemPlaceholder(
     thumbnailSize = thumbnailSize,
     modifier = modifier
 ) {
-    val (colorPalette, _, _, thumbnailShape) = LocalAppearance.current
+    val [colorPalette, _, _, thumbnailShape] = LocalAppearance.current
 
     Spacer(
         modifier = Modifier

@@ -35,7 +35,6 @@ import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
@@ -169,7 +168,7 @@ class MainActivity : ComponentActivity(), MonetColorsChangedListener {
     }
 
     private var _monet: MonetCompat? by mutableStateOf(null)
-    private val monet get() = _monet ?: throw MonetActivityAccessException()
+    val monet get() = _monet ?: throw MonetActivityAccessException()
 
     override fun onStart() {
         super.onStart()
@@ -197,7 +196,6 @@ class MainActivity : ComponentActivity(), MonetColorsChangedListener {
         addOnNewIntentListener(::handleIntent)
     }
 
-    @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     fun AppWrapper(
         modifier: Modifier = Modifier,
@@ -398,9 +396,13 @@ class MainActivity : ComponentActivity(), MonetColorsChangedListener {
             MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH -> {
                 val query = when (extras?.mediaFocus) {
                     null, "vnd.android.cursor.item/*" -> extras?.query ?: extras?.text
+
                     MediaStore.Audio.Genres.ENTRY_CONTENT_TYPE -> extras.genre
+
                     MediaStore.Audio.Artists.ENTRY_CONTENT_TYPE -> extras.artist
+
                     MediaStore.Audio.Albums.ENTRY_CONTENT_TYPE -> extras.album
+
                     "vnd.android.cursor.item/audio" -> listOfNotNull(
                         extras.album,
                         extras.artist,
@@ -447,8 +449,8 @@ class MainActivity : ComponentActivity(), MonetColorsChangedListener {
     }
 }
 
-context(context: Context)
 @Suppress("CyclomaticComplexMethod")
+context(context: Context)
 fun handleUrl(
     uri: Uri,
     binder: PlayerService.Binder?
@@ -489,7 +491,9 @@ fun handleUrl(
 
             else -> when {
                 path == "watch" -> uri.getQueryParameter("v")
+
                 uri.host == "youtu.be" -> path
+
                 else -> {
                     withContext(Dispatchers.Main) {
                         context.toast(context.getString(R.string.error_url, uri))

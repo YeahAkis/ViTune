@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package app.vitune.android.ui.screens.settings
 
 import android.content.Intent
@@ -59,13 +57,13 @@ import app.vitune.core.ui.LocalAppearance
 import app.vitune.core.ui.surface
 import app.vitune.core.ui.utils.ActivityIntentBundleAccessor
 import kotlinx.coroutines.delay
-import kotlin.time.ExperimentalTime
+import kotlin.time.Duration.Companion.milliseconds
 
 @Route
 @Composable
 fun LogsScreen() {
     val saveableStateHolder = rememberSaveableStateHolder()
-    val (tabIndex, onTabChanged) = rememberSaveable { mutableIntStateOf(0) }
+    val [tabIndex, onTabChanged] = rememberSaveable { mutableIntStateOf(0) }
 
     RouteHandler {
         GlobalRoutes()
@@ -96,7 +94,7 @@ fun LogsList(modifier: Modifier = Modifier) = Box(modifier = modifier.fillMaxSiz
     val logs = logcat()
     val state = rememberLazyListState()
 
-    val (_, typography) = LocalAppearance.current
+    val [_, typography] = LocalAppearance.current
     val context = LocalContext.current
 
     var initial by remember { mutableStateOf(true) }
@@ -104,7 +102,7 @@ fun LogsList(modifier: Modifier = Modifier) = Box(modifier = modifier.fillMaxSiz
 
     LaunchedEffect(logs.size) {
         if (initial && logs.isNotEmpty()) {
-            delay(200)
+            delay(200.milliseconds)
             state.scrollToItem(0)
             initial = false
             return@LaunchedEffect
@@ -176,7 +174,7 @@ fun LazyItemScope.FormattedLine(
     line: Logcat.FormattedLine,
     modifier: Modifier = Modifier
 ) {
-    val (colorPalette, typography, _, thumbnailShape) = LocalAppearance.current
+    val [colorPalette, typography, _, thumbnailShape] = LocalAppearance.current
 
     val backgroundColor = remember(line, colorPalette) {
         when (line.level) {

@@ -1,6 +1,5 @@
 package app.vitune.android.ui.screens.home
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -79,7 +78,6 @@ import app.vitune.providers.innertube.requests.discoverPage
 
 // TODO: a lot of duplicate code all around the codebase, especially for discover
 
-@OptIn(ExperimentalFoundationApi::class)
 @Route
 @Composable
 fun HomeDiscovery(
@@ -264,7 +262,7 @@ fun HomeDiscovery(
                         }
                     )
 
-                    val (currentMediaId, playing) = playingSong(binder)
+                    val [currentMediaId, playing] = playingSong(binder)
 
                     LazyHorizontalGrid(
                         state = trendingGridState,

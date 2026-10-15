@@ -64,7 +64,7 @@ else Manifest.permission.READ_EXTERNAL_STORAGE
 @Composable
 fun HomeLocalSongs(onSearchClick: () -> Unit) = with(OrderPreferences) {
     val context = LocalContext.current
-    val (_, typography) = LocalAppearance.current
+    val [_, typography] = LocalAppearance.current
 
     var hasPermission by remember(isCompositionLaunched()) {
         mutableStateOf(context.applicationContext.hasPermission(permission))

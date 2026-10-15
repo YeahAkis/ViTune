@@ -1,6 +1,5 @@
 package app.vitune.android.ui.screens.artist
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -55,7 +54,6 @@ private val sectionTextModifier = Modifier
     .padding(horizontal = 16.dp)
     .padding(top = 24.dp, bottom = 8.dp)
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ArtistOverview(
     youtubeArtistPage: Innertube.ArtistPage?,
@@ -138,7 +136,7 @@ fun ArtistOverview(
                         }
                     }
 
-                    val (currentMediaId, playing) = playingSong(binder)
+                    val [currentMediaId, playing] = playingSong(binder)
 
                     songs.forEach { song ->
                         SongItem(

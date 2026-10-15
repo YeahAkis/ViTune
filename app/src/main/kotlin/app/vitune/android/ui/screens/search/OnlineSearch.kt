@@ -67,6 +67,7 @@ import io.ktor.http.Url
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
 fun OnlineSearch(
@@ -94,7 +95,7 @@ fun OnlineSearch(
     LaunchedEffect(textFieldValue.text) {
         if (textFieldValue.text.isEmpty()) return@LaunchedEffect
 
-        delay(500)
+        delay(500.milliseconds)
         suggestionsResult = Innertube.searchSuggestions(
             body = SearchSuggestionsBody(input = textFieldValue.text)
         )
@@ -136,7 +137,7 @@ fun OnlineSearch(
             LaunchedEffect(focused) {
                 if (!focused) return@LaunchedEffect
 
-                delay(300)
+                delay(300.milliseconds)
                 focusRequester.requestFocus()
             }
 

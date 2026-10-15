@@ -792,7 +792,7 @@ fun LrcLibSearchDialog(
     horizontalPadding = 0.dp,
     modifier = modifier
 ) {
-    val (_, typography) = LocalAppearance.current
+    val [_, typography] = LocalAppearance.current
 
     val tracks = remember { mutableStateListOf<Track>() }
     var loading by remember { mutableStateOf(true) }
@@ -802,7 +802,7 @@ fun LrcLibSearchDialog(
         loading = true
         error = false
 
-        delay(1000)
+        delay(1000.milliseconds)
 
         LrcLib.lyrics(
             query = query,

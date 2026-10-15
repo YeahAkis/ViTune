@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package app.vitune.android.utils
 
 import android.os.Parcel
@@ -70,7 +68,7 @@ sealed interface Logcat : Parcelable {
 
         private fun String.toLine(id: Int) = runCatching {
             val results = regex.find(this)?.groups ?: return@runCatching null
-            val (timestamp, level, tag, pid, message) = results.drop(1).take(5)
+            val [timestamp, level, tag, pid, message] = results.drop(1).take(5)
                 .mapNotNull { it?.value }
 
             FormattedLine(

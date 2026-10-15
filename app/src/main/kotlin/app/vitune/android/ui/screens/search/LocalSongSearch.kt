@@ -1,6 +1,5 @@
 package app.vitune.android.ui.screens.search
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -44,7 +43,6 @@ import app.vitune.core.ui.LocalAppearance
 import app.vitune.providers.innertube.models.NavigationEndpoint
 import kotlinx.collections.immutable.toImmutableList
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun LocalSongSearch(
     textFieldValue: TextFieldValue,
@@ -67,7 +65,7 @@ fun LocalSongSearch(
 
     val lazyListState = rememberLazyListState()
 
-    val (currentMediaId, playing) = playingSong(binder)
+    val [currentMediaId, playing] = playingSong(binder)
 
     Box(modifier = modifier) {
         LazyColumn(

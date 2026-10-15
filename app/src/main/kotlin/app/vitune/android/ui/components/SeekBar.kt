@@ -472,7 +472,7 @@ private fun Density.wavePath(
     progress: Float,
     quality: Float = PlayerPreferences.wavySeekBarQuality.quality
 ) = Path().apply {
-    val (width, height) = size
+    val [width, height] = size
     val progressTau = progress * 2 * PI.toFloat()
     val scale = 7.dp.toPx()
 

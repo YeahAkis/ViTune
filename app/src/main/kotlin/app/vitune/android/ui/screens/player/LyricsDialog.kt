@@ -45,10 +45,10 @@ fun LyricsDialog(
 
     FullScreenState(shown = PlayerPreferences.lyricsShowSystemBars)
 
-    val (colorPalette, _, _, thumbnailShape) = LocalAppearance.current
+    val [colorPalette, _, _, thumbnailShape] = LocalAppearance.current
 
     val player = LocalPlayerServiceBinder.current?.player ?: return@Dialog
-    val (window, error) = windowState()
+    val [window, error] = windowState()
 
     LaunchedEffect(window, error) {
         if (window == null || error != null) currentOnDismiss()
@@ -106,7 +106,7 @@ fun LyricsDialog(
                 )
         ) {
             if (currentWindow.mediaItem.mediaMetadata.artworkUri != null) AsyncImage(
-                model = currentWindow.mediaItem.mediaMetadata.artworkUri.thumbnail((maxHeight - 64.dp).px),
+                model = currentWindow.mediaItem.mediaMetadata.artworkUri?.thumbnail((maxHeight - 64.dp).px),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier

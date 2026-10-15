@@ -395,7 +395,7 @@ private fun MediaInfo(media: UiMedia) {
             targetState = media to artistInfo,
             transitionSpec = { fadeIn() togetherWith fadeOut() },
             label = ""
-        ) { (media, state) ->
+        ) { [media, state] ->
             state?.let { artists ->
                 FadingRow(
                     modifier = Modifier

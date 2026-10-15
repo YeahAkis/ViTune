@@ -60,7 +60,7 @@ import kotlinx.collections.immutable.toImmutableList
 @Composable
 fun SettingsScreen() {
     val saveableStateHolder = rememberSaveableStateHolder()
-    val (tabIndex, onTabChanged) = rememberSaveable { mutableIntStateOf(0) }
+    val [tabIndex, onTabChanged] = rememberSaveable { mutableIntStateOf(0) }
 
     PersistMapCleanup("settings/")
 

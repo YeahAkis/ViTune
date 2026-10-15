@@ -4,7 +4,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -126,7 +125,6 @@ import kotlin.time.Duration.Companion.milliseconds
 private const val CUSTOM_QUEUE_KEY = "isFromCustomQueue"
 private const val QUEUE_LABEL_KEY = "queueLabel"
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun Queue(
     layoutState: BottomSheetState,
@@ -141,7 +139,7 @@ fun Queue(
     scrollConnection: NestedScrollConnection = remember(layoutState::preUpPostDownNestedScrollConnection),
     windowInsets: WindowInsets = WindowInsets.systemBars
 ) {
-    val (colorPalette, typography) = LocalAppearance.current
+    val [colorPalette, typography, _, thumbnailShape] = LocalAppearance.current
     val menuState = LocalMenuState.current
 
     val horizontalBottomPaddingValues = windowInsets

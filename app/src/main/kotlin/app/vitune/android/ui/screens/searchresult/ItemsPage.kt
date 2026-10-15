@@ -73,7 +73,7 @@ inline fun <T : Innertube.Item> ItemsPage(
     emptyItemsText: String = stringResource(R.string.no_items_found),
     noinline provider: (suspend (String?) -> Result<Innertube.ItemsPage<T>?>?)? = null
 ) {
-    val (_, typography) = LocalAppearance.current
+    val [_, typography] = LocalAppearance.current
     val updatedProvider by rememberUpdatedState(provider)
     val lazyListState = rememberLazyListState()
     var itemsPage by persist<Innertube.ItemsPage<T>?>(tag)
