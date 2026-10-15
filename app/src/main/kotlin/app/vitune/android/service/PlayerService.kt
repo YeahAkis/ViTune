@@ -81,6 +81,7 @@ import app.vitune.android.utils.ActionReceiver
 import app.vitune.android.utils.ConditionalCacheDataSourceFactory
 import app.vitune.android.utils.GlyphInterface
 import app.vitune.android.utils.InvincibleService
+import app.vitune.android.utils.LyricsFetcher
 import app.vitune.android.utils.TimerJob
 import app.vitune.android.utils.YouTubeDLResponse
 import app.vitune.android.utils.YouTubeRadio
@@ -593,6 +594,12 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
     }
 
     private fun maybePrefetchUpcoming() {
+        (0..PREFETCH_LOOKAHEAD).forEach { offset ->
+            val index = player.currentMediaItemIndex + offset
+            if (index >= player.mediaItemCount) return@forEach
+            LyricsFetcher.prefetch(player.getMediaItemAt(index))
+        }
+
         val upcomingIds = (1..PREFETCH_LOOKAHEAD).mapNotNull { offset ->
             val index = player.currentMediaItemIndex + offset
             if (index >= player.mediaItemCount) return@mapNotNull null
