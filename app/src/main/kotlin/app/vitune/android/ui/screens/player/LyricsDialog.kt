@@ -124,8 +124,7 @@ fun LyricsDialog(
                 ensureSongInserted = { Database.insert(currentWindow.mediaItem) },
                 onMenuLaunch = onDismiss,
                 modifier = Modifier.height(maxHeight),
-                shouldKeepScreenAwake = false, // otherwise the keepScreenOn flag resets after dialog closes
-                shouldUpdateLyrics = false
+                shouldKeepScreenAwake = false // otherwise the keepScreenOn flag resets after dialog closes
             )
         }
     }
