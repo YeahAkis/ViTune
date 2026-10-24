@@ -99,6 +99,7 @@ object Innertube {
     internal const val NEXT = "$BASE/next"
     internal const val PLAYER = "https://youtubei.googleapis.com/youtubei/v1/player"
     internal const val PLAYER_MUSIC = "$BASE/player"
+    internal const val VISITOR_ID = "https://youtubei.googleapis.com/youtubei/v1/visitor_id"
     internal const val QUEUE = "$BASE/music/get_queue"
     internal const val SEARCH = "$BASE/search"
     internal const val SEARCH_SUGGESTIONS = "$BASE/music/get_search_suggestions"

@@ -17,10 +17,15 @@ import kotlinx.coroutines.isActive
 private suspend fun Innertube.tryContexts(
     body: PlayerBody,
     checkIsValid: Boolean,
+    refreshVisitorData: Boolean,
     vararg contexts: Context
 ): PlayerResponse? {
-    contexts.forEach { context ->
+    contexts.forEach { baseContext ->
         if (!currentCoroutineContext().isActive) return null
+
+        val context = visitorData(context = baseContext, refresh = refreshVisitorData)
+            ?.let { baseContext.copy(client = baseContext.client.copy(defaultVisitorData = it)) }
+            ?: baseContext
 
         logger.info("Trying ${context.client.clientName} ${context.client.clientVersion} ${context.client.platform}")
         val cpn = generateNonceSuspend(16)
@@ -38,10 +43,11 @@ private suspend fun Innertube.tryContexts(
                 parameter("t", generateNonceSuspend(12))
                 header("X-Goog-Api-Format-Version", "2")
                 parameter("id", body.videoId)
-            }.body<PlayerResponse>().also { logger.info("Got $it") }
+            }.body<PlayerResponse>()
         }
+            ?.onFailure { logger.warn("Player request failed for ${context.client.clientName}", it) }
             ?.getOrNull()
-            ?.takeIf { checkIsValid && it.isValid }
+            ?.takeIf { !checkIsValid || it.isValid }
             ?.let {
                 return it.copy(
                     cpn = cpn,
@@ -55,7 +61,7 @@ private suspend fun Innertube.tryContexts(
 
 private val PlayerResponse.isValid
     get() = playabilityStatus?.status == "OK" &&
-        streamingData?.adaptiveFormats?.any { it.url != null || it.signatureCipher != null } == true
+        streamingData?.adaptiveFormats?.any { it.url != null } == true
 
 suspend fun Innertube.player(
     body: PlayerBody,
@@ -64,9 +70,12 @@ suspend fun Innertube.player(
     tryContexts(
         body = body,
         checkIsValid = checkIsValid,
-        Context.DefaultIOS,
-        Context.DefaultWeb,
-        Context.DefaultAndroidMusic,
-        Context.DefaultTV
+        refreshVisitorData = false,
+        Context.DefaultVisionOS
+    ) ?: tryContexts(
+        body = body,
+        checkIsValid = checkIsValid,
+        refreshVisitorData = true,
+        Context.DefaultVisionOS
     )
 }

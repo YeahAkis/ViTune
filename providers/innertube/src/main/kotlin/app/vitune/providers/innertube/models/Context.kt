@@ -22,6 +22,7 @@ data class Context(
         val clientName: String,
         val clientVersion: String,
         val platform: String? = null,
+        val clientScreen: String? = null,
         val hl: String = "en",
         val gl: String = "US",
         @SerialName("visitorData")
@@ -131,44 +132,18 @@ data class Context(
             )
         )
 
-        val DefaultIOS = Context(
+        val DefaultVisionOS = Context(
             client = Client(
-                clientId = 5,
-                clientName = "IOS",
-                clientVersion = "20.03.02",
-                deviceMake = "Apple",
-                deviceModel = "iPhone16,2",
-                osName = "iPhone",
-                osVersion = "18.2.1.22C161",
-                acceptHeader = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-                userAgent = UserAgents.IOS,
-                apiKey = "AIzaSyB-63vPrdThhKuerbB2N_l7Kwwcxj6yUAc",
-                music = false
-            )
-        )
-
-        val DefaultAndroidMusic = Context(
-            client = Client(
-                clientId = 21,
-                clientName = "ANDROID_MUSIC",
-                clientVersion = "7.27.52",
+                clientId = 101,
+                clientName = "VISIONOS",
+                clientVersion = "1.02",
                 platform = "MOBILE",
-                osVersion = "11",
-                androidSdkVersion = 30,
-                userAgent = UserAgents.ANDROID_MUSIC,
-                apiKey = "AIzaSyAOghZGza2MQSZkY_zfZ370N-PUdXEo8AI",
-                music = true
-            )
-        )
-
-        val DefaultTV = Context(
-            client = Client(
-                clientId = 7,
-                clientName = "TVHTML5",
-                clientVersion = "7.20241201.18.00",
-                platform = "TV",
-                userAgent = UserAgents.TV,
-                referer = "https://www.youtube.com/",
+                clientScreen = "WATCH",
+                deviceMake = "Apple",
+                deviceModel = "RealityDevice14,1",
+                osName = "visionOS",
+                osVersion = "25.6.0.23O471",
+                userAgent = UserAgents.VISIONOS,
                 music = false
             )
         )
@@ -189,8 +164,6 @@ val validCountryCodes =
 object UserAgents {
     const val DESKTOP =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.157 Safari/537.36"
-    const val ANDROID_MUSIC =
-        "com.google.android.apps.youtube.music/7.27.52 (Linux; U; Android 11) gzip"
-    const val IOS = "com.google.ios.youtube/20.03.02 (iPhone16,2; U; CPU iOS 18_2_1 like Mac OS X;)"
-    const val TV = "Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version"
+    const val VISIONOS =
+        "com.google.visionos.youtube/1.02 (RealityDevice14,1; U; CPU visionOS 25_6_0 like Mac OS X)"
 }
