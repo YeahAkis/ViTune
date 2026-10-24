@@ -21,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import app.vitune.android.Database
 import app.vitune.android.LocalPlayerServiceBinder
 import app.vitune.android.preferences.PlayerPreferences
@@ -40,7 +41,10 @@ import coil3.compose.AsyncImage
 fun LyricsDialog(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
-) = Dialog(onDismissRequest = onDismiss) {
+) = Dialog(
+    onDismissRequest = onDismiss,
+    properties = DialogProperties(usePlatformDefaultWidth = false)
+) {
     val currentOnDismiss by rememberUpdatedState(onDismiss)
 
     FullScreenState(shown = PlayerPreferences.lyricsShowSystemBars)
@@ -85,8 +89,7 @@ fun LyricsDialog(
     ) { currentWindow ->
         BoxWithConstraints(
             modifier = modifier
-                .padding(all = 36.dp)
-                .padding(vertical = 32.dp)
+                .padding(vertical = 48.dp)
                 .clip(thumbnailShape)
                 .fillMaxSize()
                 .background(colorPalette.background1)
@@ -124,6 +127,7 @@ fun LyricsDialog(
                 ensureSongInserted = { Database.insert(currentWindow.mediaItem) },
                 onMenuLaunch = onDismiss,
                 modifier = Modifier.height(maxHeight),
+                isFullscreen = true,
                 shouldKeepScreenAwake = false // otherwise the keepScreenOn flag resets after dialog closes
             )
         }

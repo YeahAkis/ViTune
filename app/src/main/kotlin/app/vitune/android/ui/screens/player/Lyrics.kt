@@ -69,6 +69,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.media3.common.MediaMetadata
 import app.vitune.android.Database
 import app.vitune.android.LocalPlayerServiceBinder
@@ -142,7 +143,8 @@ fun Lyrics(
     },
     shouldKeepScreenAwake: Boolean = PlayerPreferences.lyricsKeepScreenAwake,
     shouldUpdateLyrics: Boolean = true,
-    showControls: Boolean = true
+    showControls: Boolean = true,
+    isFullscreen: Boolean = false
 ) = AnimatedVisibility(
     visible = isDisplayed,
     enter = fadeIn(),
@@ -153,6 +155,8 @@ fun Lyrics(
     val currentDurationProvider by rememberUpdatedState(durationProvider)
 
     val (colorPalette, typography) = LocalAppearance.current
+    val lyricsStyle = if (isFullscreen) typography.m.copy(fontSize = 22.sp) else typography.m
+    val lyricsPadding = if (isFullscreen) 16.dp else 32.dp
     val context = LocalContext.current
     val menuState = LocalMenuState.current
     val binder = LocalPlayerServiceBinder.current
@@ -446,8 +450,8 @@ fun Lyrics(
                                                 easing = FastOutSlowInEasing
                                             )
                                         )
-                                        .padding(vertical = 4.dp, horizontal = 32.dp)
-                                        .size(typography.m.fontSize.dp)
+                                        .padding(vertical = 4.dp, horizontal = lyricsPadding)
+                                        .size(lyricsStyle.fontSize.dp)
                                 ) else WordSyncedLine(
                                     line = sentence,
                                     positionProvider = { wordSyncedLyrics.position },
@@ -455,7 +459,7 @@ fun Lyrics(
                                     inactiveColor = colorPalette.textDisabled,
                                     backgroundActiveColor = Color.White.copy(alpha = 0.7f),
                                     backgroundInactiveColor = colorPalette.textDisabled.copy(alpha = 0.75f),
-                                    style = typography.m.bold,
+                                    style = lyricsStyle.bold,
                                     modifier = Modifier
                                         .animateItem(
                                             placementSpec = tween(
@@ -464,7 +468,7 @@ fun Lyrics(
                                             )
                                         )
                                         .fillMaxWidth()
-                                        .padding(vertical = 4.dp, horizontal = 32.dp)
+                                        .padding(vertical = 4.dp, horizontal = lyricsPadding)
                                         .padding(
                                             start = if (hasDuet && sentence.oppositeAligned) 48.dp else 0.dp,
                                             end = if (hasDuet && !sentence.oppositeAligned) 48.dp else 0.dp
@@ -531,11 +535,11 @@ fun Lyrics(
                                                 easing = FastOutSlowInEasing
                                             )
                                         )
-                                        .padding(vertical = 4.dp, horizontal = 32.dp)
-                                        .size(typography.m.fontSize.dp)
+                                        .padding(vertical = 4.dp, horizontal = lyricsPadding)
+                                        .size(lyricsStyle.fontSize.dp)
                                 ) else BasicText(
                                     text = sentence,
-                                    style = typography.m.bold.color(color),
+                                    style = lyricsStyle.bold.color(color),
                                     modifier = Modifier
                                         .animateItem(
                                             placementSpec = tween(
@@ -543,7 +547,7 @@ fun Lyrics(
                                                 easing = FastOutSlowInEasing
                                             )
                                         )
-                                        .padding(vertical = 4.dp, horizontal = 32.dp)
+                                        .padding(vertical = 4.dp, horizontal = lyricsPadding)
                                 )
                             }
                             item(key = "footer", contentType = 0) {
@@ -554,22 +558,22 @@ fun Lyrics(
 
                     else -> BasicText(
                         text = lyrics?.synced.orEmpty(),
-                        style = typography.m.bold.color(colorPalette.onOverlay),
+                        style = lyricsStyle.bold.color(colorPalette.onOverlay),
                         modifier = Modifier
                             .verticalFadingEdge()
                             .verticalScroll(rememberScrollState())
                             .fillMaxWidth()
-                            .padding(vertical = maxHeight / 4, horizontal = 32.dp)
+                            .padding(vertical = maxHeight / 4, horizontal = lyricsPadding)
                     )
                 }
             } else BasicText(
                 text = lyrics?.fixed.orEmpty(),
-                style = typography.m.bold.color(colorPalette.onOverlay),
+                style = lyricsStyle.bold.color(colorPalette.onOverlay),
                 modifier = Modifier
                     .verticalFadingEdge()
                     .verticalScroll(rememberScrollState())
                     .fillMaxWidth()
-                    .padding(vertical = maxHeight / 4, horizontal = 32.dp)
+                    .padding(vertical = maxHeight / 4, horizontal = lyricsPadding)
             )
         }
 
@@ -578,7 +582,7 @@ fun Lyrics(
             modifier = Modifier
                 .shimmer()
                 .fillMaxWidth()
-                .padding(horizontal = 32.dp)
+                .padding(horizontal = lyricsPadding)
         ) {
             listOf(0.9f, 0.7f, 0.85f, 0.55f, 0.8f, 0.65f, 0.75f).forEachIndexed { index, width ->
                 TextPlaceholder(
