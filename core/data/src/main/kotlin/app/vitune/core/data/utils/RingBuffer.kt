@@ -10,6 +10,10 @@ open class RingBuffer<T>(val size: Int, private val init: (index: Int) -> T) : I
     private var index = 0
 
     operator fun get(index: Int) = list.getOrNull(index)
+    operator fun set(index: Int, element: T) {
+        list[index] = element
+    }
+
     operator fun plusAssign(element: T) {
         list[index++ % size] = element
     }
@@ -30,15 +34,22 @@ class UriCache<Key : Any, Meta>(size: Int = 16) {
         val uri: Uri
     )
 
+    @Synchronized
     operator fun get(key: Key) = buffer.find { it != null && it.key == key }
 
+    @Synchronized
     fun push(
         key: Key,
         meta: Meta,
         uri: Uri
     ) {
-        buffer += CachedUri(key, meta, uri)
+        val cachedUri = CachedUri(key, meta, uri)
+        val index = buffer.indexOfFirst { it?.key == key }
+
+        if (index >= 0) buffer[index] = cachedUri
+        else buffer += cachedUri
     }
 
+    @Synchronized
     fun clear() = buffer.clear()
 }

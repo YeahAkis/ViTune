@@ -19,6 +19,7 @@ import androidx.media3.datasource.TransferListener
 import androidx.media3.datasource.cache.Cache
 import androidx.media3.datasource.cache.CacheDataSource
 import java.io.EOFException
+import java.io.IOException
 import kotlin.math.pow
 
 class RangeHandlerDataSourceFactory(private val parent: DataSource.Factory) : DataSource.Factory {
@@ -54,18 +55,27 @@ class CatchingDataSourceFactory(
     private val onError: ((Throwable) -> Unit)?
 ) : DataSource.Factory {
     inner class Source(private val parent: DataSource) : DataSource by parent {
-        override fun open(dataSpec: DataSpec) = runCatching {
-            parent.open(dataSpec)
-        }.getOrElse { ex ->
+        private fun handle(ex: Throwable): Nothing {
             ex.printStackTrace()
 
-            if (ex is PlaybackException) throw ex
-            else throw PlaybackException(
-                /* message = */ "Unknown playback error",
-                /* cause = */ ex,
-                /* errorCode = */ PlaybackException.ERROR_CODE_UNSPECIFIED
-            ).also { onError?.invoke(it) }
+            when (ex) {
+                is PlaybackException -> throw ex
+                is IOException -> throw ex.also { onError?.invoke(it) }
+                else -> throw PlaybackException(
+                    /* message = */ "Unknown playback error",
+                    /* cause = */ ex,
+                    /* errorCode = */ PlaybackException.ERROR_CODE_UNSPECIFIED
+                ).also { onError?.invoke(it) }
+            }
         }
+
+        override fun open(dataSpec: DataSpec) = runCatching {
+            parent.open(dataSpec)
+        }.getOrElse(::handle)
+
+        override fun read(buffer: ByteArray, offset: Int, length: Int) = runCatching {
+            parent.read(buffer, offset, length)
+        }.getOrElse(::handle)
 
         override fun getResponseHeaders(): Map<String, List<String>> = parent.responseHeaders
     }
@@ -240,3 +250,90 @@ class UserAgentOverridingDataSourceFactory(
 
 val Context.defaultDataSource: DataSource.Factory
     get() = UserAgentOverridingDataSourceFactory(context = this)
+
+class ChunkedDataSourceFactory(
+    private val upstream: DataSource.Factory,
+    private val chunkLength: Long
+) : DataSource.Factory {
+    inner class Source(private val upstream: DataSource) : DataSource {
+        private var dataSpec: DataSpec? = null
+        private var passthrough = false
+        private var position = 0L
+        private var end = C.LENGTH_UNSET.toLong()
+        private var chunkEnd = 0L
+
+        override fun addTransferListener(transferListener: TransferListener) =
+            upstream.addTransferListener(transferListener)
+
+        override fun open(dataSpec: DataSpec): Long {
+            passthrough = dataSpec.uri.scheme?.startsWith("http") != true
+            if (passthrough) return upstream.open(dataSpec)
+
+            this.dataSpec = dataSpec
+            position = dataSpec.position
+            end = if (dataSpec.length == C.LENGTH_UNSET.toLong()) C.LENGTH_UNSET.toLong()
+            else dataSpec.position + dataSpec.length
+
+            openChunk()
+
+            if (end == C.LENGTH_UNSET.toLong()) end = totalLength() ?: C.LENGTH_UNSET.toLong()
+            return if (end == C.LENGTH_UNSET.toLong()) C.LENGTH_UNSET.toLong()
+            else end - dataSpec.position
+        }
+
+        private fun openChunk() {
+            val spec = dataSpec ?: error("Not opened")
+            val length = if (end == C.LENGTH_UNSET.toLong()) chunkLength
+            else (end - position).coerceAtMost(chunkLength)
+
+            val opened = upstream.open(spec.subrange(position - spec.position, length))
+            chunkEnd = position + if (opened == C.LENGTH_UNSET.toLong()) length else opened
+        }
+
+        private fun totalLength() = upstream.responseHeaders.entries
+            .firstOrNull { it.key.equals("Content-Range", ignoreCase = true) }
+            ?.value
+            ?.firstOrNull()
+            ?.substringAfterLast('/')
+            ?.toLongOrNull()
+
+        override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+            if (passthrough) return upstream.read(buffer, offset, length)
+            if (length == 0) return 0
+            if (end != C.LENGTH_UNSET.toLong() && position >= end) return C.RESULT_END_OF_INPUT
+
+            if (position >= chunkEnd) {
+                upstream.close()
+                runCatching { openChunk() }.getOrElse { e ->
+                    if (end == C.LENGTH_UNSET.toLong() &&
+                        e.findCause<InvalidResponseCodeException>()?.responseCode == 416
+                    ) return C.RESULT_END_OF_INPUT
+                    throw e
+                }
+            }
+
+            val read = upstream.read(
+                buffer,
+                offset,
+                length.toLong().coerceAtMost(chunkEnd - position).toInt()
+            )
+            if (read == C.RESULT_END_OF_INPUT) return C.RESULT_END_OF_INPUT
+
+            position += read
+            return read
+        }
+
+        override fun getUri(): Uri? = upstream.uri
+        override fun getResponseHeaders(): Map<String, List<String>> = upstream.responseHeaders
+
+        override fun close() {
+            dataSpec = null
+            upstream.close()
+        }
+    }
+
+    override fun createDataSource() = Source(upstream.createDataSource())
+}
+
+fun DataSource.Factory.chunked(chunkLength: Long): DataSource.Factory =
+    ChunkedDataSourceFactory(this, chunkLength)

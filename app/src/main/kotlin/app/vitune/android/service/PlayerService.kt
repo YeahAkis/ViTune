@@ -17,6 +17,7 @@ import android.media.audiofx.LoudnessEnhancer
 import android.media.audiofx.PresetReverb
 import android.media.session.MediaSession
 import android.media.session.PlaybackState
+import android.net.Uri
 import android.os.Bundle
 import android.os.SystemClock
 import android.support.v4.media.session.MediaSessionCompat
@@ -88,6 +89,7 @@ import app.vitune.android.utils.YouTubeRadio
 import app.vitune.android.utils.activityPendingIntent
 import app.vitune.android.utils.asDataSource
 import app.vitune.android.utils.broadcastPendingIntent
+import app.vitune.android.utils.chunked
 import app.vitune.android.utils.clearCustomQueue
 import app.vitune.android.utils.defaultDataSource
 import app.vitune.android.utils.findCause
@@ -121,7 +123,9 @@ import app.vitune.core.ui.utils.streamVolumeFlow
 import app.vitune.providers.innertube.Innertube
 import app.vitune.providers.innertube.models.NavigationEndpoint
 import app.vitune.providers.innertube.models.UserAgents
+import app.vitune.providers.innertube.models.bodies.PlayerBody
 import app.vitune.providers.innertube.models.bodies.SearchBody
+import app.vitune.providers.innertube.requests.player
 import app.vitune.providers.innertube.requests.searchPage
 import app.vitune.providers.innertube.utils.from
 import app.vitune.providers.sponsorblock.SponsorBlock
@@ -161,7 +165,11 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
+import org.schabi.newpipe.extractor.NewPipe
+import org.schabi.newpipe.extractor.stream.StreamInfo
 import java.io.IOException
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.milliseconds
 import android.os.Binder as AndroidBinder
@@ -603,25 +611,8 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
 
         upcomingIds.forEach { mediaId ->
             coroutineScope.launch(Dispatchers.IO) {
-                if (streamUriCache[mediaId] != null) return@launch
-
-                resolutionMutexFor(mediaId).withLock {
-                    if (streamUriCache[mediaId] != null) return@withLock
-
-                    runCatching { resolveStream(mediaId) }
-                        .onSuccess { resolved ->
-                            streamUriCache.push(
-                                key = mediaId,
-                                meta = StreamMeta(
-                                    contentLength = resolved.fileSize,
-                                    userAgent = resolved.userAgent,
-                                    noRangeRequests = resolved.uri.getQueryParameter("gir") == "yes"
-                                ),
-                                uri = resolved.uri
-                            )
-                        }
-                        .onFailure { it.printStackTrace() }
-                }
+                runCatching { resolveCached(mediaId, streamUriCache) }
+                    .onFailure { it.printStackTrace() }
             }
         }
     }
@@ -1377,7 +1368,8 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
 
     companion object {
         private const val DEFAULT_CACHE_DIRECTORY = "exoplayer"
-        private const val DEFAULT_CHUNK_LENGTH = 512 * 1024L
+        private const val CHUNK_LENGTH = 4 * 1024 * 1024L
+        private const val EXPIRY_MARGIN_MS = 60_000L
         private const val PREFETCH_LOOKAHEAD = 5
 
         fun createDatabaseProvider(context: Context) = StandaloneDatabaseProvider(context)
@@ -1398,129 +1390,107 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
             SimpleCache(directory, cacheEvictor, createDatabaseProvider(context))
         }
 
-        @Suppress("CyclomaticComplexMethod")
-        data class StreamMeta(
-            val contentLength: Long?,
-            val userAgent: String? = null,
-            val noRangeRequests: Boolean = false
-        )
+        class StreamMeta(val stream: ResolvedStream) {
+            val persisted = AtomicBoolean(false)
+        }
+
+        fun createYouTubeUpstreamDataSourceFactory(
+            context: Context,
+            findMediaItem: suspend (videoId: String) -> MediaItem? = { null },
+            uriCache: UriCache<String, StreamMeta?> = UriCache()
+        ): DataSource.Factory = ResolvingDataSource.Factory(
+            context.defaultDataSource.chunked(CHUNK_LENGTH)
+        ) { dataSpec ->
+            if (dataSpec.isLocal) return@Factory dataSpec
+
+            val mediaId = dataSpec.key?.removePrefix("https://youtube.com/watch?v=")
+                ?: error("A key must be set")
+
+            val meta = uriCache.fresh(mediaId)?.takeIf { it.persisted.get() }
+                ?: runBlocking(Dispatchers.IO) {
+                    resolveCached(mediaId, uriCache).also { meta ->
+                        if (meta.persisted.compareAndSet(false, true))
+                            persistStream(mediaId, meta.stream, findMediaItem)
+                    }
+                }
+
+            dataSpec
+                .withUri(meta.stream.uri)
+                .withAdditionalHeaders(
+                    mapOf("User-Agent" to (meta.stream.userAgent ?: UserAgents.DESKTOP))
+                )
+        }
 
         fun createYouTubeDataSourceResolverFactory(
             context: Context,
             cache: Cache,
-            chunkLength: Long? = DEFAULT_CHUNK_LENGTH,
             findMediaItem: suspend (videoId: String) -> MediaItem? = { null },
             uriCache: UriCache<String, StreamMeta?> = UriCache()
-        ): DataSource.Factory = ResolvingDataSource.Factory(
-            ConditionalCacheDataSourceFactory(
-                cacheDataSourceFactory = cache.readOnlyWhen { PlayerPreferences.pauseCache }.asDataSource,
-                upstreamDataSourceFactory = context.defaultDataSource,
-                shouldCache = { !it.isLocal }
-            )
-        ) { dataSpec ->
-            val mediaId = dataSpec.key?.removePrefix("https://youtube.com/watch?v=")
-                ?: error("A key must be set")
-
-            fun DataSpec.ranged(meta: StreamMeta?): DataSpec {
-                val effectiveUA = meta?.userAgent ?: UserAgents.DESKTOP
-
-                return if (meta?.noRangeRequests == true) {
-                    // gir=yes formats (IOS client) 403 on a second ranged request against
-                    // the same URL — fetch the whole stream in one shot instead of chunking.
-                    this.withAdditionalHeaders(mapOf("User-Agent" to effectiveUA))
-                } else meta?.contentLength?.let { contentLength ->
-                    if (chunkLength == null) return@let null
-
-                    val start = dataSpec.uriPositionOffset
-                    val length = (contentLength - start).coerceAtMost(chunkLength)
-
-                    val headers = buildMap {
-                        put("Range", "bytes=$start-${start + length - 1}")
-                        put("User-Agent", effectiveUA)
-                    }
-
-                    this.subrange(start, length).withAdditionalHeaders(headers)
-                } ?: meta?.let {
-                    // contentLength is null, but we still have a UA to forward
-                    this.withAdditionalHeaders(mapOf("User-Agent" to effectiveUA))
-                } ?: this // local file or other non-YouTube source: leave untouched
-            }
-
-            if (
-                dataSpec.isLocal || (
-                    chunkLength != null && cache.isCached(
-                        /* key = */ mediaId,
-                        /* position = */ dataSpec.position,
-                        /* length = */ chunkLength
-                    )
-                    )
-            ) dataSpec
-            else uriCache[mediaId]?.let { cachedUri ->
-                dataSpec
-                    .withUri(cachedUri.uri)
-                    .ranged(cachedUri.meta)
-            } ?: runBlocking(Dispatchers.IO) {
-                resolutionMutexFor(mediaId).withLock {
-                    uriCache[mediaId]?.let { cachedUri ->
-                        return@withLock dataSpec
-                            .withUri(cachedUri.uri)
-                            .ranged(cachedUri.meta)
-                    }
-
-                    val resolved = resolveStream(mediaId)
-
-                    val mediaItem = runCatching { findMediaItem(mediaId) }.getOrNull()
-
-                    val extras = mediaItem?.mediaMetadata?.extras?.songBundle
-                    if (extras?.durationText == null) resolved.approxDurationMs
-                        ?.div(1000)
-                        ?.let(DateUtils::formatElapsedTime)
-                        ?.removePrefix("0")
-                        ?.let { durationText ->
-                            extras?.durationText = durationText
-                            Database.updateDurationText(mediaId, durationText)
-                        }
-
-                    transaction {
-                        runCatching {
-                            mediaItem?.let(Database::insert)
-                            Database.insert(
-                                Format(
-                                    songId = mediaId,
-                                    itag = resolved.formatId?.toIntOrNull(),
-                                    mimeType = resolved.mimeType,
-                                    bitrate = resolved.bitrate,
-                                    loudnessDb = resolved.loudnessDb,
-                                    contentLength = resolved.fileSize,
-                                    lastModified = resolved.lastModified
-                                )
-                            )
-                        }
-                    }
-
-                    val streamMeta = StreamMeta(
-                        contentLength = resolved.fileSize,
-                        userAgent = resolved.userAgent,
-                        noRangeRequests = resolved.uri.getQueryParameter("gir") == "yes"
-                    )
-
-                    uriCache.push(
-                        key = mediaId,
-                        meta = streamMeta,
-                        uri = resolved.uri
-                    )
-
-                    dataSpec
-                        .withUri(resolved.uri)
-                        .ranged(streamMeta)
-                }
-            }
-        }.handleUnknownErrors {
+        ): DataSource.Factory = ConditionalCacheDataSourceFactory(
+            cacheDataSourceFactory = cache.readOnlyWhen { PlayerPreferences.pauseCache }.asDataSource,
+            upstreamDataSourceFactory = createYouTubeUpstreamDataSourceFactory(
+                context = context,
+                findMediaItem = findMediaItem,
+                uriCache = uriCache
+            ),
+            shouldCache = { !it.isLocal }
+        ).handleUnknownErrors {
             uriCache.clear()
         }
 
-        private data class ResolvedStream(
-            val uri: android.net.Uri,
+        private fun UriCache<String, StreamMeta?>.fresh(mediaId: String) =
+            this[mediaId]?.meta?.takeUnless { it.stream.isExpired }
+
+        suspend fun resolveCached(
+            mediaId: String,
+            uriCache: UriCache<String, StreamMeta?>
+        ): StreamMeta = uriCache.fresh(mediaId) ?: resolutionMutexFor(mediaId).withLock {
+            uriCache.fresh(mediaId) ?: StreamMeta(resolveStream(mediaId)).also {
+                uriCache.push(
+                    key = mediaId,
+                    meta = it,
+                    uri = it.stream.uri
+                )
+            }
+        }
+
+        private suspend fun persistStream(
+            mediaId: String,
+            resolved: ResolvedStream,
+            findMediaItem: suspend (videoId: String) -> MediaItem?
+        ) {
+            val mediaItem = runCatching { findMediaItem(mediaId) }.getOrNull()
+
+            val extras = mediaItem?.mediaMetadata?.extras?.songBundle
+            if (extras?.durationText == null) resolved.approxDurationMs
+                ?.div(1000)
+                ?.let(DateUtils::formatElapsedTime)
+                ?.removePrefix("0")
+                ?.let { durationText ->
+                    extras?.durationText = durationText
+                    Database.updateDurationText(mediaId, durationText)
+                }
+
+            transaction {
+                runCatching {
+                    mediaItem?.let(Database::insert)
+                    Database.insert(
+                        Format(
+                            songId = mediaId,
+                            itag = resolved.formatId?.toIntOrNull(),
+                            mimeType = resolved.mimeType,
+                            bitrate = resolved.bitrate,
+                            loudnessDb = resolved.loudnessDb,
+                            contentLength = resolved.fileSize,
+                            lastModified = resolved.lastModified
+                        )
+                    )
+                }
+            }
+        }
+
+        data class ResolvedStream(
+            val uri: Uri,
             val fileSize: Long?,
             val formatId: String?,
             val bitrate: Long?,
@@ -1529,21 +1499,56 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
             val userAgent: String?,
             val loudnessDb: Float?,
             val approxDurationMs: Long?
-        )
+        ) {
+            private val expiresAtMs = uri.getQueryParameter("expire")?.toLongOrNull()?.times(1000)
 
-        private val resolutionMutexes = java.util.concurrent.ConcurrentHashMap<String, Mutex>()
+            val isExpired
+                get() = expiresAtMs != null &&
+                    System.currentTimeMillis() > expiresAtMs - EXPIRY_MARGIN_MS
+        }
+
+        private val resolutionMutexes = ConcurrentHashMap<String, Mutex>()
         private fun resolutionMutexFor(mediaId: String): Mutex =
             resolutionMutexes.getOrPut(mediaId) { Mutex() }
 
+        private val INNERTUBE_RESOLVE_TIMEOUT = 5_000L.milliseconds
         private val NEWPIPE_RESOLVE_TIMEOUT = 8_000L.milliseconds
         private val YTDLP_RESOLVE_TIMEOUT = 15_000L.milliseconds
+
+        private suspend fun viaInnertube(mediaId: String): ResolvedStream {
+            val response = withTimeout(INNERTUBE_RESOLVE_TIMEOUT) {
+                Innertube.player(PlayerBody(videoId = mediaId))
+            }?.getOrThrow() ?: throw IllegalStateException("Unplayable (InnerTube: no valid response)")
+
+            response.videoDetails?.videoId?.let {
+                if (it != mediaId) throw IllegalStateException("Video ID Mismatch")
+            }
+
+            val format = response.streamingData?.highestQualityFormat
+                ?: throw IllegalStateException("Unplayable (InnerTube: no audio format)")
+            val uri = runCatching { format.url?.toUri() }.getOrNull()
+                ?.let { url -> response.cpn?.let { url.buildUpon().appendQueryParameter("cpn", it).build() } ?: url }
+                ?: throw IllegalStateException("Unplayable (InnerTube: no URL)")
+
+            return ResolvedStream(
+                uri = uri,
+                fileSize = format.contentLength,
+                formatId = format.itag.toString(),
+                bitrate = format.bitrate,
+                mimeType = format.mimeType,
+                lastModified = format.lastModified,
+                userAgent = response.context?.client?.userAgent,
+                loudnessDb = response.playerConfig?.audioConfig?.normalizedLoudnessDb,
+                approxDurationMs = format.approxDurationMs
+            )
+        }
 
         private suspend fun viaNewPipe(mediaId: String): ResolvedStream {
             Dependencies.ensureNewPipeInitialized()
             val streamInfo = withTimeout(NEWPIPE_RESOLVE_TIMEOUT) {
                 withContext(Dispatchers.IO) {
-                    org.schabi.newpipe.extractor.stream.StreamInfo.getInfo(
-                        org.schabi.newpipe.extractor.NewPipe.getService(0),
+                    StreamInfo.getInfo(
+                        NewPipe.getService(0),
                         "https://www.youtube.com/watch?v=$mediaId"
                     )
                 }
@@ -1590,19 +1595,23 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
             )
         }
 
-        private suspend fun resolveStream(mediaId: String): ResolvedStream =
-            when (PlayerPreferences.extractorMode) {
-                ExtractorMode.InnerTube,
-                ExtractorMode.NewPipe ->
-                    runCatching { viaNewPipe(mediaId) }
-                        .onFailure { it.printStackTrace() }
-                        .recoverCatching { viaYtDlp(mediaId) }
-                        .getOrElse { throw IllegalStateException("Unplayable: all extractors failed", it) }
-                ExtractorMode.YtDlp ->
-                    runCatching { viaYtDlp(mediaId) }
-                        .onFailure { it.printStackTrace() }
-                        .recoverCatching { viaNewPipe(mediaId) }
-                        .getOrElse { throw IllegalStateException("Unplayable: all extractors failed", it) }
+        private suspend fun resolveStream(mediaId: String): ResolvedStream {
+            val extractors: List<suspend (String) -> ResolvedStream> =
+                when (PlayerPreferences.extractorMode) {
+                    ExtractorMode.InnerTube -> listOf(::viaInnertube, ::viaNewPipe, ::viaYtDlp)
+                    ExtractorMode.NewPipe -> listOf(::viaNewPipe, ::viaInnertube, ::viaYtDlp)
+                    ExtractorMode.YtDlp -> listOf(::viaYtDlp, ::viaNewPipe, ::viaInnertube)
+                }
+
+            var failure: Throwable? = null
+            extractors.forEach { extractor ->
+                runCatching { return extractor(mediaId) }.onFailure {
+                    it.printStackTrace()
+                    failure?.addSuppressed(it) ?: run { failure = it }
+                }
             }
+
+            throw IllegalStateException("Unplayable: all extractors failed", failure)
+        }
     }
 }
