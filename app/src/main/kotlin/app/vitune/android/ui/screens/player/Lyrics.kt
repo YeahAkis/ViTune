@@ -7,9 +7,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -27,11 +25,11 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -44,6 +42,7 @@ import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -51,6 +50,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -58,12 +58,15 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.MediaMetadata
@@ -374,11 +377,15 @@ fun Lyrics(
             val lazyListState = rememberLazyListState()
             val wordSyncedLyrics = remember(lyrics?.wordSynced) {
                 lyrics?.wordSynced?.let { wordSynced ->
-                    WordSynchronizedLyrics(wordSynced.lines.toImmutableList()) {
-                        binder?.player?.let { player ->
-                            player.currentPosition + UPDATE_DELAY - (lyrics?.startTime ?: 0L)
-                        } ?: 0L
-                    }
+                    WordSynchronizedLyrics(
+                        lines = wordSynced.lines.toImmutableList(),
+                        positionProvider = {
+                            binder?.player?.let { player ->
+                                player.currentPosition + UPDATE_DELAY - (lyrics?.startTime ?: 0L)
+                            } ?: 0L
+                        },
+                        isPlayingProvider = { binder?.player?.isPlaying == true }
+                    )
                 }
             }
 
@@ -395,8 +402,7 @@ fun Lyrics(
                             )
 
                             while (true) {
-                                delay(UPDATE_DELAY)
-                                if (!currentWordSyncedLyrics.update()) continue
+                                if (!withFrameNanos(currentWordSyncedLyrics::onFrame)) continue
 
                                 launch {
                                     lazyListState.animateScrollToItem(
@@ -440,7 +446,7 @@ fun Lyrics(
                                         .size(typography.m.fontSize.dp)
                                 ) else WordSyncedLine(
                                     line = sentence,
-                                    position = wordSyncedLyrics.position,
+                                    positionProvider = { wordSyncedLyrics.position },
                                     activeColor = Color.White,
                                     inactiveColor = colorPalette.textDisabled,
                                     backgroundActiveColor = Color.White.copy(alpha = 0.7f),
@@ -726,58 +732,106 @@ fun Lyrics(
 @Composable
 private fun WordSyncedLine(
     line: WordSyncedLyrics.Line,
-    position: Long,
+    positionProvider: () -> Float,
     activeColor: Color,
     inactiveColor: Color,
     backgroundActiveColor: Color,
     backgroundInactiveColor: Color,
-    style: androidx.compose.ui.text.TextStyle,
+    style: TextStyle,
     modifier: Modifier = Modifier
-) = FlowRow(
-    modifier = modifier,
-    horizontalArrangement = Arrangement.spacedBy(0.dp)
 ) {
-    line.words.forEach { word ->
-        val rawProgress = when {
-            position <= word.begin -> 0f
-            position >= word.end -> 1f
-            word.end <= word.begin -> 1f
-            else -> ((position - word.begin).toFloat() / (word.end - word.begin).toFloat())
-                .coerceIn(0f, 1f)
-        }
+    val currentPositionProvider by rememberUpdatedState(positionProvider)
+    val density = LocalDensity.current
+    val textMeasurer = rememberTextMeasurer()
 
-        val fillProgress by animateFloatAsState(
-            targetValue = rawProgress,
-            animationSpec = tween(durationMillis = UPDATE_DELAY.toInt(), easing = LinearEasing),
-            label = "wordFill"
-        )
-
-        val isActive = position in word.begin..word.end
-        val lift by animateDpAsState(
-            targetValue = if (isActive) (-3).dp else 0.dp,
-            animationSpec = tween(durationMillis = 150),
-            label = "wordLift"
-        )
-
-        val (inactive, active) = if (word.background) backgroundInactiveColor to backgroundActiveColor
-        else inactiveColor to activeColor
-
-        Box(modifier = Modifier.offset(y = lift)) {
-            BasicText(
-                text = word.text + word.separator,
-                style = style.copy(color = inactive)
-            )
-            BasicText(
-                text = word.text + word.separator,
-                style = style.copy(color = active),
-                modifier = Modifier.drawWithContent {
-                    clipRect(right = size.width * fillProgress) {
-                        this@drawWithContent.drawContent()
-                    }
-                }
-            )
+    val spaceWidth = remember(style, density) {
+        with(density) {
+            val spaced = textMeasurer.measure("a a", style).size.width
+            val joined = textMeasurer.measure("aa", style).size.width
+            (spaced - joined).toDp()
         }
     }
+    val groups = remember(line) { line.words.toWordGroups() }
+
+    FlowRow(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(spaceWidth)
+    ) {
+        groups.forEach { group ->
+            Row {
+                group.forEach { word ->
+                    WordSyncedWord(
+                        word = word,
+                        positionProvider = { currentPositionProvider() },
+                        activeColor = if (word.background) backgroundActiveColor else activeColor,
+                        inactiveColor = if (word.background) backgroundInactiveColor else inactiveColor,
+                        style = style
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WordSyncedWord(
+    word: WordSyncedLyrics.Word,
+    positionProvider: () -> Float,
+    activeColor: Color,
+    inactiveColor: Color,
+    style: TextStyle
+) {
+    val fill by remember(word) { derivedStateOf { word.fill(positionProvider()) } }
+    val lift by remember(word) { derivedStateOf { word.lift(positionProvider()) } }
+    val text = remember(word) { if (word.separator.isBlank()) word.text else word.text + word.separator }
+
+    Box(
+        modifier = Modifier.graphicsLayer {
+            translationY = -WORD_LIFT.toPx() * lift
+        }
+    ) {
+        BasicText(
+            text = text,
+            style = style.copy(color = inactiveColor)
+        )
+        BasicText(
+            text = text,
+            style = style.copy(color = activeColor),
+            modifier = Modifier.drawWithContent {
+                if (fill > 0f) clipRect(right = size.width * fill) {
+                    this@drawWithContent.drawContent()
+                }
+            }
+        )
+    }
+}
+
+private fun List<WordSyncedLyrics.Word>.toWordGroups(): List<List<WordSyncedLyrics.Word>> = buildList {
+    var current = mutableListOf<WordSyncedLyrics.Word>()
+    this@toWordGroups.forEach { word ->
+        current += word
+        if (word.separator.isNotEmpty()) {
+            add(current)
+            current = mutableListOf()
+        }
+    }
+    if (current.isNotEmpty()) add(current)
+}
+
+private val WORD_LIFT = 3.dp
+private const val WORD_LIFT_DURATION = 150f
+
+private fun WordSyncedLyrics.Word.fill(position: Float) = when {
+    position <= begin -> 0f
+    position >= end || end <= begin -> 1f
+    else -> (position - begin) / (end - begin)
+}
+
+private fun WordSyncedLyrics.Word.lift(position: Float): Float {
+    val rise = ((position - begin) / WORD_LIFT_DURATION).coerceIn(0f, 1f)
+    val fall = ((position - end) / WORD_LIFT_DURATION).coerceIn(0f, 1f)
+    val amount = rise * (1f - fall)
+    return amount * amount * (3f - 2f * amount)
 }
 
 @Composable
