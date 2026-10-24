@@ -47,9 +47,12 @@ import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException
 import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.datasource.cache.Cache
+import androidx.media3.datasource.cache.CacheDataSource
+import androidx.media3.datasource.cache.CacheWriter
 import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
 import androidx.media3.datasource.cache.NoOpCacheEvictor
 import androidx.media3.datasource.cache.SimpleCache
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.analytics.AnalyticsListener
@@ -127,6 +130,7 @@ import app.vitune.providers.innertube.models.bodies.PlayerBody
 import app.vitune.providers.innertube.models.bodies.SearchBody
 import app.vitune.providers.innertube.requests.player
 import app.vitune.providers.innertube.requests.searchPage
+import app.vitune.providers.innertube.requests.visitorData
 import app.vitune.providers.innertube.utils.from
 import app.vitune.providers.sponsorblock.SponsorBlock
 import app.vitune.providers.sponsorblock.models.Action
@@ -308,7 +312,21 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
         )
 
         cache = createCache(this)
+        if (PlayerPreferences.extractorMode == ExtractorMode.InnerTube)
+            coroutineScope.launch(Dispatchers.IO) { Innertube.visitorData() }
+
         player = ExoPlayer.Builder(this, createRendersFactory(), createMediaSourceFactory())
+            .setLoadControl(
+                DefaultLoadControl.Builder()
+                    .setBufferDurationsMs(
+                        /* minBufferMs = */ DefaultLoadControl.DEFAULT_MIN_BUFFER_MS,
+                        /* maxBufferMs = */ DefaultLoadControl.DEFAULT_MAX_BUFFER_MS,
+                        /* bufferForPlaybackMs = */ BUFFER_FOR_PLAYBACK_MS,
+                        /* bufferForPlaybackAfterRebufferMs = */
+                        DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS
+                    )
+                    .build()
+            )
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_LOCAL)
             .setAudioAttributes(
@@ -609,12 +627,42 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
             player.getMediaItemAt(index).mediaId.removePrefix("https://youtube.com/watch?v=")
         }
 
-        upcomingIds.forEach { mediaId ->
+        upcomingIds.forEachIndexed { index, mediaId ->
             coroutineScope.launch(Dispatchers.IO) {
-                runCatching { resolveCached(mediaId, streamUriCache) }
+                val meta = runCatching { resolveCached(mediaId, streamUriCache) }
                     .onFailure { it.printStackTrace() }
+                    .getOrNull() ?: return@launch
+
+                if (index == 0) precacheHead(mediaId, meta.stream)
             }
         }
+    }
+
+    private fun precacheHead(mediaId: String, stream: ResolvedStream) {
+        if (PlayerPreferences.pauseCache) return
+
+        val length = stream.fileSize?.coerceAtMost(PRECACHE_HEAD_LENGTH) ?: PRECACHE_HEAD_LENGTH
+        if (cache.isCached(mediaId, 0, length)) return
+
+        val dataSpec = DataSpec.Builder()
+            .setUri(stream.uri)
+            .setKey(mediaId)
+            .setLength(length)
+            .setHttpRequestHeaders(mapOf("User-Agent" to (stream.userAgent ?: UserAgents.DESKTOP)))
+            .build()
+
+        runCatching {
+            CacheWriter(
+                /* dataSource = */
+                CacheDataSource.Factory()
+                    .setCache(cache)
+                    .setUpstreamDataSourceFactory(applicationContext.defaultDataSource)
+                    .createDataSource(),
+                /* dataSpec = */ dataSpec,
+                /* temporaryBuffer = */ null,
+                /* progressListener = */ null
+            ).cache()
+        }.onFailure { it.printStackTrace() }
     }
 
     private fun maybeSavePlayerQueue() {
@@ -1369,6 +1417,8 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
     companion object {
         private const val DEFAULT_CACHE_DIRECTORY = "exoplayer"
         private const val CHUNK_LENGTH = 4 * 1024 * 1024L
+        private const val PRECACHE_HEAD_LENGTH = 512 * 1024L
+        private const val BUFFER_FOR_PLAYBACK_MS = 1_000
         private const val EXPIRY_MARGIN_MS = 60_000L
         private const val PREFETCH_LOOKAHEAD = 5
 
