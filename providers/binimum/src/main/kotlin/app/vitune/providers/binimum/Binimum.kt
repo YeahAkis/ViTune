@@ -87,11 +87,20 @@ object Binimum {
             org.xml.sax.InputSource(StringReader(raw))
         )
 
+        val oppositeAgents = document.getElementsByTagName("ttm:agent").let { nodes ->
+            buildList {
+                for (index in 0 until nodes.length) {
+                    val agent = nodes.item(index) as? Element ?: continue
+                    if (agent.getAttribute("type") == "person") add(agent.getAttribute("xml:id"))
+                }
+            }.filterIndexed { index, _ -> index % 2 == 1 }.toSet()
+        }
+
         val lines = document.getElementsByTagName("p").let { nodes ->
             buildList {
                 for (index in 0 until nodes.length) {
                     (nodes.item(index) as? Element)
-                        ?.toLine()
+                        ?.toLine(oppositeAgents)
                         ?.let(::add)
                 }
             }
@@ -100,7 +109,7 @@ object Binimum {
         lines.takeIf { it.isNotEmpty() }?.let { WordSyncedLyrics(it) }
     }.getOrNull()
 
-    private fun Element.toLine(): WordSyncedLyrics.Line? {
+    private fun Element.toLine(oppositeAgents: Set<String>): WordSyncedLyrics.Line? {
         val songPart = parentElement("div")?.getAttribute("itunes:songPart")?.takeIf { it.isNotBlank() }
         val begin = getAttribute("begin").takeIf { it.isNotBlank() }?.toTimestampMillis()
         val end = getAttribute("end").takeIf { it.isNotBlank() }?.toTimestampMillis()
@@ -119,7 +128,8 @@ object Binimum {
             begin = lineBegin,
             end = lineEnd,
             words = words,
-            songPart = songPart
+            songPart = songPart,
+            oppositeAligned = getAttribute("ttm:agent") in oppositeAgents
         )
     }
 

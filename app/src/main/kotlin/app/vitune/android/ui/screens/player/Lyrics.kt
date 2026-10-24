@@ -413,6 +413,10 @@ fun Lyrics(
                             }
                         }
 
+                        val hasDuet = remember(wordSyncedLyrics) {
+                            wordSyncedLyrics.lines.any { it.oppositeAligned }
+                        }
+
                         LazyColumn(
                             state = lazyListState,
                             userScrollEnabled = false,
@@ -459,7 +463,12 @@ fun Lyrics(
                                                 easing = FastOutSlowInEasing
                                             )
                                         )
+                                        .fillMaxWidth()
                                         .padding(vertical = 4.dp, horizontal = 32.dp)
+                                        .padding(
+                                            start = if (hasDuet && sentence.oppositeAligned) 48.dp else 0.dp,
+                                            end = if (hasDuet && !sentence.oppositeAligned) 48.dp else 0.dp
+                                        )
                                 )
                             }
                             item(key = "footer", contentType = 0) {
@@ -755,7 +764,10 @@ private fun WordSyncedLine(
 
     FlowRow(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(spaceWidth)
+        horizontalArrangement = Arrangement.spacedBy(
+            space = spaceWidth,
+            alignment = if (line.oppositeAligned) Alignment.End else Alignment.Start
+        )
     ) {
         groups.forEach { group ->
             Row {

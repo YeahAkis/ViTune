@@ -11,7 +11,8 @@ data class WordSyncedLyrics(
         val begin: Long,
         val end: Long,
         val words: List<Word>,
-        val songPart: String? = null
+        val songPart: String? = null,
+        val oppositeAligned: Boolean = false
     ) {
         val text get() = words.joinToString(separator = "") { it.text + it.separator }
     }
