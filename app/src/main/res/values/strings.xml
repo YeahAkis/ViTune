@@ -381,6 +381,5 @@
         <item quantity="other">%1$d songs</item>
     </plurals>
     <string name="extractor">Extractor</string>
-    <string name="extractor_description">Currently: %1$s - leave at NewPipe if you don\'t know what you\'re doing</string>
-    <string name="extractor_innertube_broken">InnerTube (broken)</string>
+    <string name="extractor_description">Currently: %1$s - leave at InnerTube if you don\'t know what you\'re doing</string>
 </resources>

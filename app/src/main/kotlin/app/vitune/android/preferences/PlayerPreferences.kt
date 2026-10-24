@@ -36,7 +36,7 @@ object PlayerPreferences : GlobalPreferencesHolder() {
     var stopWhenClosed by boolean(false)
     var stopOnMinimumVolume by boolean(true)
 
-    var extractorMode by enum(ExtractorMode.NewPipe)
+    var extractorMode by enum(ExtractorMode.InnerTube)
 
     var isShowingLyrics by boolean(false)
     var isShowingSynchronizedLyrics by boolean(false)
