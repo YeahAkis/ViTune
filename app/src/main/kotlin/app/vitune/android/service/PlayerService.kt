@@ -17,6 +17,8 @@ import android.media.audiofx.LoudnessEnhancer
 import android.media.audiofx.PresetReverb
 import android.media.session.MediaSession
 import android.media.session.PlaybackState
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Bundle
 import android.os.SystemClock
@@ -143,6 +145,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -179,6 +182,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 import android.os.Binder as AndroidBinder
 
 const val LOCAL_KEY_PREFIX = "local:"
@@ -188,6 +192,19 @@ private const val TAG = "PlayerService"
 val DataSpec.isLocal get() = key?.startsWith(LOCAL_KEY_PREFIX) == true
 
 val MediaItem.isLocal get() = mediaId.startsWith(LOCAL_KEY_PREFIX)
+
+private fun Throwable.isNetworkFailure(seen: MutableSet<Throwable> = mutableSetOf()): Boolean {
+    if (!seen.add(this)) return false
+    if (this is IOException || this is TimeoutCancellationException) return true
+    return cause?.isNetworkFailure(seen) == true || suppressed.any { it.isNetworkFailure(seen) }
+}
+
+private val Context.hasValidatedNetwork: Boolean
+    get() {
+        val manager = getSystemService<ConnectivityManager>() ?: return true
+        val capabilities = manager.getNetworkCapabilities(manager.activeNetwork) ?: return false
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+    }
 val Song.isLocal get() = id.startsWith(LOCAL_KEY_PREFIX)
 
 private const val LIKE_ACTION = "app.vitune.android.LIKE"
@@ -252,6 +269,8 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
     private var sponsorBlockJob: Job? = null
     private lateinit var discordPresence: DiscordPresence
     private var isSleepTimerFading = false
+    private var errorRecoveryJob: Job? = null
+    private var errorRecoveryAttempts = 0
 
     override var isInvincibilityEnabled by mutableStateOf(false)
 
@@ -544,6 +563,7 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
 
         mediaItemState.update { mediaItem }
 
+        resetErrorRecovery()
         maybeRecoverPlaybackError()
         maybeNormalizeVolume()
         maybeProcessRadio()
@@ -578,6 +598,8 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
             player.play()
             return
         }
+
+        if (maybeRecoverFromNetworkError(error)) return
 
         if (!PlayerPreferences.skipOnError || !player.hasNextMediaItem()) return
 
@@ -616,6 +638,33 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
 
     private fun maybeRecoverPlaybackError() {
         if (player.playerError != null) player.prepare()
+    }
+
+    private fun maybeRecoverFromNetworkError(error: PlaybackException): Boolean {
+        val mediaItem = player.currentMediaItem ?: return false
+        if (mediaItem.isLocal || error.errorCode !in RECOVERABLE_ERROR_CODES) return false
+
+        val attempt = errorRecoveryAttempts
+        if (attempt >= MAX_ERROR_RECOVERY_ATTEMPTS) return false
+        errorRecoveryAttempts++
+
+        errorRecoveryJob?.cancel()
+        errorRecoveryJob = coroutineScope.launch {
+            delay(ERROR_RECOVERY_DELAYS[attempt])
+            streamUriCache.clear()
+
+            withContext(Dispatchers.Main) {
+                if (player.playerError != null && player.currentMediaItem?.mediaId == mediaItem.mediaId)
+                    player.prepare()
+            }
+        }
+        return true
+    }
+
+    private fun resetErrorRecovery() {
+        errorRecoveryJob?.cancel()
+        errorRecoveryJob = null
+        errorRecoveryAttempts = 0
     }
 
     private fun maybeProcessRadio() {
@@ -1137,6 +1186,7 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
 
         updatePlaybackState()
         maybeUpdateDiscordPresence(events)
+        if (events.contains(Player.EVENT_IS_PLAYING_CHANGED) && player.isPlaying) errorRecoveryAttempts = 0
 
         if (
             !events.containsAny(
@@ -1280,7 +1330,7 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
         /* extractorsFactory = */
         DefaultExtractorsFactory()
     ).setLoadErrorHandlingPolicy(
-        object : DefaultLoadErrorHandlingPolicy() {
+        object : DefaultLoadErrorHandlingPolicy(MIN_LOADABLE_RETRY_COUNT) {
             override fun isEligibleForFallback(exception: IOException) = true
         }
     )
@@ -1567,6 +1617,15 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
         private const val BUFFER_FOR_PLAYBACK_MS = 1_000
         private const val EXPIRY_MARGIN_MS = 60_000L
         private const val MINUTE_MILLIS = 60_000L
+        private const val MIN_LOADABLE_RETRY_COUNT = 6
+        private const val MAX_ERROR_RECOVERY_ATTEMPTS = 3
+        private val ERROR_RECOVERY_DELAYS = listOf(3.seconds, 10.seconds, 30.seconds)
+        private val RECOVERABLE_ERROR_CODES = setOf(
+            PlaybackException.ERROR_CODE_IO_UNSPECIFIED,
+            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
+            PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS
+        )
         const val SLEEP_TIMER_MIN_MILLIS = MINUTE_MILLIS
         const val SLEEP_TIMER_MAX_MILLIS = 10 * 60 * MINUTE_MILLIS
         private const val SLEEP_TIMER_REQUEST_CODE = 1
@@ -1607,13 +1666,17 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
             val mediaId = dataSpec.key?.removePrefix("https://youtube.com/watch?v=")
                 ?: error("A key must be set")
 
-            val meta = uriCache.fresh(mediaId)?.takeIf { it.persisted.get() }
-                ?: runBlocking(Dispatchers.IO) {
+            val meta = uriCache.fresh(mediaId)?.takeIf { it.persisted.get() } ?: runCatching {
+                runBlocking(Dispatchers.IO) {
                     resolveCached(mediaId, uriCache, cache).also { meta ->
                         if (meta.persisted.compareAndSet(false, true))
                             persistStream(mediaId, meta.stream, findMediaItem)
                     }
                 }
+            }.getOrElse {
+                if (context.hasValidatedNetwork && !it.isNetworkFailure()) throw it
+                throw IOException("Couldn't resolve a stream for $mediaId because of a network failure", it)
+            }
 
             dataSpec
                 .withUri(meta.stream.uri)
