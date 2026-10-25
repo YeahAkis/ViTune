@@ -14,6 +14,7 @@ import kotlin.time.Duration.Companion.hours
 object DataPreferences : GlobalPreferencesHolder() {
     var coilDiskCacheMaxSize by enum(CoilDiskCacheSize.`128MB`)
     var exoPlayerDiskCacheMaxSize by enum(ExoPlayerDiskCacheSize.`2GB`)
+    var songQuality by enum(SongQuality.Best)
     var pauseHistory by boolean(false)
     var pausePlaytime by boolean(false)
     var pauseSearchHistory by boolean(false)
@@ -36,6 +37,17 @@ object DataPreferences : GlobalPreferencesHolder() {
         PastMonth(displayName = { stringResource(R.string.past_month) }, duration = 30.days),
         PastYear(displayName = { stringResource(R.string.past_year) }, 365.days),
         AllTime(displayName = { stringResource(R.string.all_time) })
+    }
+
+    enum class SongQuality(
+        val displayName: @Composable () -> String,
+        val itags: List<Int>
+    ) {
+        Best(displayName = { stringResource(R.string.song_quality_best) }, itags = listOf(251, 140)),
+        SaveStorage(
+            displayName = { stringResource(R.string.song_quality_save_storage) },
+            itags = listOf(250, 249, 139)
+        )
     }
 
     enum class QuickPicksSource(val displayName: @Composable () -> String) {

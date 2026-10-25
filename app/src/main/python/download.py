@@ -57,6 +57,7 @@ def download(quickjs_bin: str, video_id: str) -> str:
                 'format_id': f.get('format_id'),
                 'url': f.get('url'),
                 'abr': f.get('abr'),
+                'filesize': f.get('filesize') or f.get('filesize_approx'),
             }
             for f in (info.get('formats') or [])
             if f.get('vcodec', 'none') == 'none' and f.get('url')

@@ -116,6 +116,13 @@ fun CacheSettings() = with(DataPreferences) {
                     selectedValue = exoPlayerDiskCacheMaxSize,
                     onValueSelect = { exoPlayerDiskCacheMaxSize = it }
                 )
+                EnumValueSelectorSettingsEntry(
+                    title = stringResource(R.string.song_quality),
+                    text = stringResource(R.string.song_quality_description),
+                    selectedValue = songQuality,
+                    onValueSelect = { songQuality = it },
+                    valueText = { it.displayName() }
+                )
                 SwitchSettingsEntry(
                     title = stringResource(R.string.pause_song_cache),
                     text = stringResource(R.string.pause_song_cache_description),

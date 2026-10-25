@@ -27,6 +27,8 @@ data class YouTubeDLResponse(
         @SerialName("format_id")
         val formatId: String,
         val url: String? = null,
-        val abr: Double? = null
+        val abr: Double? = null,
+        @SerialName("filesize")
+        val fileSize: Long? = null
     )
 }

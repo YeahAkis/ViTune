@@ -172,7 +172,8 @@ class PrecacheService : DownloadService(
             /* databaseProvider = */ PlayerService.createDatabaseProvider(this),
             /* cache = */ cache,
             /* upstreamFactory = */ PlayerService.createYouTubeUpstreamDataSourceFactory(
-                context = this
+                context = this,
+                cache = cache
             ),
             /* executor = */ executor
         ).apply {

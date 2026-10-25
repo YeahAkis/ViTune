@@ -77,6 +77,7 @@ import app.vitune.android.models.Song
 import app.vitune.android.models.SongWithContentLength
 import app.vitune.android.preferences.AppearancePreferences
 import app.vitune.android.preferences.DataPreferences
+import app.vitune.android.preferences.DataPreferences.SongQuality
 import app.vitune.android.preferences.ExtractorMode
 import app.vitune.android.preferences.PlayerPreferences
 import app.vitune.android.query
@@ -153,6 +154,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapMerge
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -629,7 +631,7 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
 
         upcomingIds.forEachIndexed { index, mediaId ->
             coroutineScope.launch(Dispatchers.IO) {
-                val meta = runCatching { resolveCached(mediaId, streamUriCache) }
+                val meta = runCatching { resolveCached(mediaId, streamUriCache, cache) }
                     .onFailure { it.printStackTrace() }
                     .getOrNull() ?: return@launch
 
@@ -1446,6 +1448,7 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
 
         fun createYouTubeUpstreamDataSourceFactory(
             context: Context,
+            cache: Cache? = null,
             findMediaItem: suspend (videoId: String) -> MediaItem? = { null },
             uriCache: UriCache<String, StreamMeta?> = UriCache()
         ): DataSource.Factory = ResolvingDataSource.Factory(
@@ -1458,7 +1461,7 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
 
             val meta = uriCache.fresh(mediaId)?.takeIf { it.persisted.get() }
                 ?: runBlocking(Dispatchers.IO) {
-                    resolveCached(mediaId, uriCache).also { meta ->
+                    resolveCached(mediaId, uriCache, cache).also { meta ->
                         if (meta.persisted.compareAndSet(false, true))
                             persistStream(mediaId, meta.stream, findMediaItem)
                     }
@@ -1480,6 +1483,7 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
             cacheDataSourceFactory = cache.readOnlyWhen { PlayerPreferences.pauseCache }.asDataSource,
             upstreamDataSourceFactory = createYouTubeUpstreamDataSourceFactory(
                 context = context,
+                cache = cache,
                 findMediaItem = findMediaItem,
                 uriCache = uriCache
             ),
@@ -1493,9 +1497,10 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
 
         suspend fun resolveCached(
             mediaId: String,
-            uriCache: UriCache<String, StreamMeta?>
+            uriCache: UriCache<String, StreamMeta?>,
+            cache: Cache? = null
         ): StreamMeta = uriCache.fresh(mediaId) ?: resolutionMutexFor(mediaId).withLock {
-            uriCache.fresh(mediaId) ?: StreamMeta(resolveStream(mediaId)).also {
+            uriCache.fresh(mediaId) ?: StreamMeta(resolveStream(mediaId, preferredItags(mediaId, cache))).also {
                 uriCache.push(
                     key = mediaId,
                     meta = it,
@@ -1565,7 +1570,16 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
         private val NEWPIPE_RESOLVE_TIMEOUT = 8_000L.milliseconds
         private val YTDLP_RESOLVE_TIMEOUT = 15_000L.milliseconds
 
-        private suspend fun viaInnertube(mediaId: String): ResolvedStream {
+        private suspend fun preferredItags(mediaId: String, cache: Cache?): List<Int> {
+            val itags = DataPreferences.songQuality.itags
+            if (cache == null || cache.getCachedSpans(mediaId).isEmpty()) return itags
+
+            val cachedItag = runCatching { Database.format(mediaId).first()?.itag }.getOrNull()
+                ?: return SongQuality.Best.itags
+            return listOf(cachedItag) + itags
+        }
+
+        private suspend fun viaInnertube(mediaId: String, itags: List<Int>): ResolvedStream {
             val response = withTimeout(INNERTUBE_RESOLVE_TIMEOUT) {
                 Innertube.player(PlayerBody(videoId = mediaId))
             }?.getOrThrow() ?: throw IllegalStateException("Unplayable (InnerTube: no valid response)")
@@ -1574,7 +1588,7 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
                 if (it != mediaId) throw IllegalStateException("Video ID Mismatch")
             }
 
-            val format = response.streamingData?.highestQualityFormat
+            val format = response.streamingData?.audioFormat(itags)
                 ?: throw IllegalStateException("Unplayable (InnerTube: no audio format)")
             val uri = runCatching { format.url?.toUri() }.getOrNull()
                 ?.let { url -> response.cpn?.let { url.buildUpon().appendQueryParameter("cpn", it).build() } ?: url }
@@ -1593,7 +1607,7 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
             )
         }
 
-        private suspend fun viaNewPipe(mediaId: String): ResolvedStream {
+        private suspend fun viaNewPipe(mediaId: String, itags: List<Int>): ResolvedStream {
             Dependencies.ensureNewPipeInitialized()
             val streamInfo = withTimeout(NEWPIPE_RESOLVE_TIMEOUT) {
                 withContext(Dispatchers.IO) {
@@ -1603,7 +1617,9 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
                     )
                 }
             }
-            val audioStream = streamInfo.audioStreams.maxByOrNull { it.bitrate }
+            val audioStream = itags.firstNotNullOfOrNull { itag ->
+                streamInfo.audioStreams.firstOrNull { it.itag == itag }
+            } ?: streamInfo.audioStreams.maxByOrNull { it.bitrate }
                 ?: throw IllegalStateException("Unplayable (NewPipe: no audio streams)")
             val uri = runCatching { audioStream.content.toUri() }.getOrNull()
                 ?: throw IllegalStateException("Unplayable (NewPipe: no content URL)")
@@ -1621,21 +1637,24 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
             )
         }
 
-        private suspend fun viaYtDlp(mediaId: String): ResolvedStream {
+        private suspend fun viaYtDlp(mediaId: String, itags: List<Int>): ResolvedStream {
             val info = withTimeout(YTDLP_RESOLVE_TIMEOUT) {
                 withContext(Dispatchers.IO) {
                     YouTubeDLResponse.fromString(Dependencies.runDownload(mediaId))
                 }
             }
             if (info.id != mediaId) throw IllegalStateException("Video ID Mismatch")
-            val format = info.formats?.firstOrNull { it.formatId == info.formatId }
-            val uri = runCatching { info.url?.toUri() }.getOrNull()
+            val preferred = itags.firstNotNullOfOrNull { itag ->
+                info.formats?.firstOrNull { it.formatId == itag.toString() && it.url != null }
+            }
+            val format = preferred ?: info.formats?.firstOrNull { it.formatId == info.formatId }
+            val uri = runCatching { (preferred?.url ?: info.url)?.toUri() }.getOrNull()
                 ?: throw IllegalStateException("Unplayable (yt-dlp: no URL)")
 
             return ResolvedStream(
                 uri = uri,
-                fileSize = info.fileSize,
-                formatId = info.formatId,
+                fileSize = preferred?.fileSize ?: info.fileSize.takeIf { preferred == null },
+                formatId = preferred?.formatId ?: info.formatId,
                 bitrate = format?.abr?.let { it * 1000 }?.toLong(),
                 mimeType = null,
                 lastModified = null,
@@ -1645,8 +1664,8 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
             )
         }
 
-        private suspend fun resolveStream(mediaId: String): ResolvedStream {
-            val extractors: List<suspend (String) -> ResolvedStream> =
+        private suspend fun resolveStream(mediaId: String, itags: List<Int>): ResolvedStream {
+            val extractors: List<suspend (String, List<Int>) -> ResolvedStream> =
                 when (PlayerPreferences.extractorMode) {
                     ExtractorMode.InnerTube -> listOf(::viaInnertube, ::viaNewPipe, ::viaYtDlp)
                     ExtractorMode.NewPipe -> listOf(::viaNewPipe, ::viaInnertube, ::viaYtDlp)
@@ -1655,7 +1674,7 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
 
             var failure: Throwable? = null
             extractors.forEach { extractor ->
-                runCatching { return extractor(mediaId) }.onFailure {
+                runCatching { return extractor(mediaId, itags) }.onFailure {
                     it.printStackTrace()
                     failure?.addSuppressed(it) ?: run { failure = it }
                 }
