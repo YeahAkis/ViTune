@@ -134,8 +134,6 @@
     <string name="search_lyrics_online">Rechercher des paroles en ligne</string>
     <string name="refetch_lyrics">Récupérer les paroles à nouveau</string>
     <string name="pick_from_lrclib">Choisissez les paroles sur lrclib.net</string>
-    <string name="set_lyrics_start_offset">Définir le décalage de départ</string>
-    <string name="set_lyrics_start_offset_description">Décale les paroles synchronisées en fonction du temps de lecture actuel</string>
     <string name="playback_speed">Vitesse</string>
     <string name="playback_pitch">Pas</string>
     <string name="playback_settings">Vitesse et hauteur</string>

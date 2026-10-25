@@ -134,8 +134,6 @@
     <string name="search_lyrics_online">Cercar lletres a internet</string>
     <string name="refetch_lyrics">Tornar a cercar lletres</string>
     <string name="pick_from_lrclib">Escollir lletres de lrclib.net</string>
-    <string name="set_lyrics_start_offset">Establir desplaçament inicial</string>
-    <string name="set_lyrics_start_offset_description">Desplaça les lletres sincronitzades pel temps de reproducció actual</string>
     <string name="playback_speed">Velocitat</string>
     <string name="playback_pitch">To</string>
     <string name="playback_settings">Velocitat i to</string>

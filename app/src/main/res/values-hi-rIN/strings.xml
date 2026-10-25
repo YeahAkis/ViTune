@@ -134,8 +134,6 @@
     <string name="search_lyrics_online">गीत गीतिकाव्य खोजें</string>
     <string name="refetch_lyrics">गीतिकाव्य फिर से लाएँ</string>
     <string name="pick_from_lrclib">lrclib.net से गीतिकाव्य चुनें</string>
-    <string name="set_lyrics_start_offset">आरंभिक ऑफसेट सेट करें</string>
-    <string name="set_lyrics_start_offset_description">वर्तमान प्लेबैक समय के अनुसार सिंक्रनाइज़ किए गए गीतों को ऑफसेट करता है</string>
     <string name="playback_speed">रफ़्तार</string>
     <string name="playback_pitch">उतार-चढ़ाव</string>
     <string name="playback_settings">गति और उतार-चढ़ाव</string>

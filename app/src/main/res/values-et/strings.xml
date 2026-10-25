@@ -134,8 +134,6 @@
     <string name="search_lyrics_online">Otsi laulusõnu internetis</string>
     <string name="refetch_lyrics">Uuenda laulusõnu</string>
     <string name="pick_from_lrclib">Vali laulusõnad lrclib.net\'ist</string>
-    <string name="set_lyrics_start_offset">Määra laulusõnade alguse nihke</string>
-    <string name="set_lyrics_start_offset_description">Nihutab sünkroniseeritud laulusõnu praeguse esitusaaja järgi</string>
     <string name="playback_speed">Esituse kiirus</string>
     <string name="playback_pitch">Helikõrgus</string>
     <string name="playback_settings">Kiirus ja helikõrgus</string>

@@ -134,8 +134,12 @@
     <string name="search_lyrics_online">Search lyrics online</string>
     <string name="refetch_lyrics">Fetch lyrics again</string>
     <string name="pick_from_lrclib">Pick lyrics from lrclib.net</string>
-    <string name="set_lyrics_start_offset">Set start offset</string>
-    <string name="set_lyrics_start_offset_description">Offsets the synchronized lyrics by the current playback time</string>
+    <string name="lyrics_offset">Lyrics offset</string>
+    <string name="lyrics_offset_menu_description">Shift the synchronized lyrics earlier or later</string>
+    <string name="lyrics_offset_description">Negative values show lyrics earlier, positive values later</string>
+    <string name="lyrics_offset_hint">Seconds</string>
+    <string name="lyrics_offset_use_current_position">Use current time</string>
+    <string name="format_lyrics_offset_step">%1$+.1fs</string>
     <string name="playback_speed">Speed</string>
     <string name="playback_pitch">Pitch</string>
     <string name="playback_settings">Speed &amp; pitch</string>

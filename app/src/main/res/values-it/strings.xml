@@ -156,8 +156,6 @@
     <string name="search_lyrics_online">Cerca testi online</string>
     <string name="refetch_lyrics">Recupera nuovamente i testi</string>
     <string name="pick_from_lrclib">Scegli testi da lrclib.net</string>
-    <string name="set_lyrics_start_offset">Imposta offset iniziale</string>
-    <string name="set_lyrics_start_offset_description">Compensa i testi sincronizzati con il tempo di riproduzione attuale</string>
 
     <string name="playback_speed">Velocità</string>
     <string name="playback_pitch">Tono</string>

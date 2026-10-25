@@ -129,8 +129,6 @@
     <string name="search_lyrics_online">Cari lirik secara online</string>
     <string name="refetch_lyrics">Mengambil lirik lagi</string>
     <string name="pick_from_lrclib">Pilih lirik dari lrclib.net</string>
-    <string name="set_lyrics_start_offset">Atur offset awal</string>
-    <string name="set_lyrics_start_offset_description">Menyesuaikan lirik yang disinkronkan dengan waktu pemutaran saat ini</string>
     <string name="playback_speed">Kecepatan pemutaran</string>
     <string name="minimum_speed_value">Mengapa Anda melakukan ini?!</string>
     <string name="volume_boost">Peningkatan volume</string>

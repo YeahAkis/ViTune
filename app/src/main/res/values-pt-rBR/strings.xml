@@ -134,8 +134,6 @@
     <string name="search_lyrics_online">Buscar letra online</string>
     <string name="refetch_lyrics">Baixar letra novamente</string>
     <string name="pick_from_lrclib">Baixar letra de lrclib.net</string>
-    <string name="set_lyrics_start_offset">Definir atraso no começo da música</string>
-    <string name="set_lyrics_start_offset_description">Compensa as letras sincronizadas pelo tempo de reprodução atual</string>
     <string name="playback_speed">Velocidade</string>
     <string name="playback_pitch">Tom</string>
     <string name="playback_settings">Velocidade &amp; tom</string>

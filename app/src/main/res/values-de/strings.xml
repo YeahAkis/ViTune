@@ -134,8 +134,6 @@
     <string name="search_lyrics_online">Liedtexte online suchen</string>
     <string name="refetch_lyrics">Liedext erneut laden</string>
     <string name="pick_from_lrclib">Liedtext von lrclib.net auswählen</string>
-    <string name="set_lyrics_start_offset">Start-Offset einstellen</string>
-    <string name="set_lyrics_start_offset_description">Verschiebt den synchronisierten Liedtext um die aktuelle Wiedergabezeit</string>
     <string name="playback_speed">Geschwindigkeit</string>
     <string name="playback_pitch">Tonhöhe</string>
     <string name="playback_settings">Geschwindigkeit &amp; Tonhöhe</string>

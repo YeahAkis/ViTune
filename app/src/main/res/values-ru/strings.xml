@@ -134,8 +134,6 @@
     <string name="search_lyrics_online">Искать тексты онлайн</string>
     <string name="refetch_lyrics">Повторно получить тексты</string>
     <string name="pick_from_lrclib">Выбрать текст из lrclib.net</string>
-    <string name="set_lyrics_start_offset">Установить смещение начала текста</string>
-    <string name="set_lyrics_start_offset_description">Смещение синхронизированных текстов на текущую позицию воспроизведения</string>
     <string name="playback_speed">Скорость воспроизведения</string>
     <string name="playback_pitch">Тональность</string>
     <string name="playback_settings">Скорость и тональность</string>

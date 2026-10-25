@@ -134,8 +134,6 @@
     <string name="search_lyrics_online">Zoek online naar songtekst</string>
     <string name="refetch_lyrics">Laad songtekst opnieuw in</string>
     <string name="pick_from_lrclib">Kies songtekst van lrclib.net</string>
-    <string name="set_lyrics_start_offset">Stel startpunt in</string>
-    <string name="set_lyrics_start_offset_description">Laat de gesynchroniseerde songtekst beginnen vanaf de huidige tijd</string>
     <string name="playback_speed">Snelheid</string>
     <string name="playback_pitch">Toonhoogte</string>
     <string name="playback_settings">Snelheid en toonhoogte</string>

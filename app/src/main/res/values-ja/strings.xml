@@ -133,8 +133,6 @@
     <string name="search_lyrics_online">Webで歌詞を検索する</string>
     <string name="refetch_lyrics">歌詞を読み込みなおす</string>
     <string name="pick_from_lrclib">lrclib.net から歌詞を選択</string>
-    <string name="set_lyrics_start_offset">開始位置の設定</string>
-    <string name="set_lyrics_start_offset_description">同期した歌詞の開始位置を現在の再生時間に設定します</string>
     <string name="playback_speed">再生速度</string>
     <string name="playback_pitch">ピッチ</string>
     <string name="playback_settings">再生速度とピッチ</string>

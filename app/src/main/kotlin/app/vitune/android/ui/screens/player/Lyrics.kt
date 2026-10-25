@@ -174,6 +174,7 @@ fun Lyrics(
 
     var editing by remember(mediaId, shouldShowSynchronizedLyrics) { mutableStateOf(false) }
     var picking by remember(mediaId, shouldShowSynchronizedLyrics) { mutableStateOf(false) }
+    var editingOffset by remember(mediaId) { mutableStateOf(false) }
     var error by remember(mediaId, shouldShowSynchronizedLyrics) { mutableStateOf(false) }
 
     val text = remember(lyrics, showSynchronizedLyrics) {
@@ -260,6 +261,17 @@ fun Lyrics(
             }
         }
     )
+
+    if (editingOffset) lyrics?.let { current ->
+        LyricsOffsetDialog(
+            offsetMillis = current.startTime ?: 0L,
+            currentPositionMillis = { binder?.player?.currentPosition ?: 0L },
+            onOffsetChange = { offset ->
+                query { Database.upsert(current.copy(startTime = offset.takeIf { it != 0L })) }
+            },
+            onDismiss = { editingOffset = false }
+        )
+    }
 
     if (picking && shouldShowSynchronizedLyrics && lyrics?.wordSynced == null) {
         var query by rememberSaveable {
@@ -712,23 +724,17 @@ fun Lyrics(
                                                 picking = true
                                             }
                                         )
-                                        MenuEntry(
-                                            icon = R.drawable.play_skip_forward,
-                                            text = stringResource(R.string.set_lyrics_start_offset),
-                                            secondaryText = stringResource(
-                                                R.string.set_lyrics_start_offset_description
-                                            ),
-                                            onClick = {
-                                                menuState.hide()
-                                                lyrics?.let {
-                                                    val startTime = binder?.player?.currentPosition
-                                                    query {
-                                                        Database.upsert(it.copy(startTime = startTime))
-                                                    }
-                                                }
-                                            }
-                                        )
                                     }
+
+                                    if (shouldShowSynchronizedLyrics && lyrics != null) MenuEntry(
+                                        icon = R.drawable.play_skip_forward,
+                                        text = stringResource(R.string.lyrics_offset),
+                                        secondaryText = stringResource(R.string.lyrics_offset_menu_description),
+                                        onClick = {
+                                            menuState.hide()
+                                            editingOffset = true
+                                        }
+                                    )
                                 }
                             }
                         }

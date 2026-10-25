@@ -134,8 +134,6 @@
     <string name="search_lyrics_online">Претражи текст песме на мрежи</string>
     <string name="refetch_lyrics">Поново преузми текст песме</string>
     <string name="pick_from_lrclib">Изаберите текст са lrclib.net</string>
-    <string name="set_lyrics_start_offset">Подеси старт офсет</string>
-    <string name="set_lyrics_start_offset_description">Офсетује синхронизовани текст песме у односу на тренутно време репродукције</string>
     <string name="playback_speed">Брзина репродукције</string>
     <string name="playback_pitch">Тон</string>
     <string name="playback_settings">Брзина &amp; тон</string>

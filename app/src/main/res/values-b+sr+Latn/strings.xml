@@ -134,8 +134,6 @@
     <string name="search_lyrics_online">Pretraži tekst pesme na mreži</string>
     <string name="refetch_lyrics">Ponovo preuzmi tekst pesme</string>
     <string name="pick_from_lrclib">Izaberite tekst sa lrclib.net</string>
-    <string name="set_lyrics_start_offset">Podesi start ofset</string>
-    <string name="set_lyrics_start_offset_description">Ofsetuje sinhronizovani tekst pesme u odnosu na trenutno vreme reprodukcije</string>
     <string name="playback_speed">Brzina reprodukcije</string>
     <string name="playback_pitch">Ton</string>
     <string name="playback_settings">Brzina &amp; ton</string>

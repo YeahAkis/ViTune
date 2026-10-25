@@ -131,8 +131,6 @@
     <string name="search_lyrics_online">Şarkı sözlerini internette ara</string>
     <string name="refetch_lyrics">Şarkı sözlerini tekrar getir</string>
     <string name="pick_from_lrclib">Şarkı sözlerini lrclib.net\'ten seç</string>
-    <string name="set_lyrics_start_offset">Başlangıç ofsetini ayarla</string>
-    <string name="set_lyrics_start_offset_description">Senkronize edilmiş şarkı sözlerini mevcut çalma süresine göre dengeler</string>
     <string name="playback_speed">Hız</string>
     <string name="playback_pitch">Eğim</string>
     <string name="playback_settings">Hız ve perde</string>
