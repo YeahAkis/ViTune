@@ -1,5 +1,6 @@
 package app.vitune.android.ui.screens.settings
 
+import android.content.Intent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -31,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastForEachIndexed
 import androidx.credentials.CredentialManager
 import app.vitune.android.Database
+import app.vitune.android.DiscordLoginActivity
 import app.vitune.android.LocalCredentialManager
 import app.vitune.android.R
 import app.vitune.android.models.PipedSession
@@ -309,17 +311,8 @@ fun SyncSettings(
 
 @Composable
 private fun DiscordSettingsGroup() {
-    var loggingIn by remember { mutableStateOf(false) }
+    val context = LocalContext.current
     val isLoggedIn = DiscordPreferences.token.isNotBlank()
-
-    if (loggingIn) DiscordLoginDialog(
-        onDismiss = { loggingIn = false },
-        onToken = {
-            DiscordPreferences.token = it
-            DiscordPreferences.enabled = true
-            loggingIn = false
-        }
-    )
 
     SettingsGroup(title = stringResource(R.string.discord)) {
         SettingsDescription(text = stringResource(R.string.discord_warning))
@@ -333,7 +326,7 @@ private fun DiscordSettingsGroup() {
                 if (isLoggedIn) {
                     DiscordPreferences.token = ""
                     DiscordPreferences.enabled = false
-                } else loggingIn = true
+                } else context.startActivity(Intent(context, DiscordLoginActivity::class.java))
             }
         )
         SwitchSettingsEntry(

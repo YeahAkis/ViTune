@@ -68,6 +68,12 @@
             android:value="false" />
 
         <activity
+            android:name=".DiscordLoginActivity"
+            android:exported="false"
+            android:theme="@style/Theme.ViTune.NoActionBar"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTask"
