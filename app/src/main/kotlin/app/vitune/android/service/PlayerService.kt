@@ -249,6 +249,7 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
     private var preferenceUpdaterJob: Job? = null
     private var volumeNormalizationJob: Job? = null
     private var sponsorBlockJob: Job? = null
+    private lateinit var discordPresence: DiscordPresence
 
     override var isInvincibilityEnabled by mutableStateOf(false)
 
@@ -384,6 +385,11 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
 
         maybeResumePlaybackWhenDeviceConnected()
 
+        discordPresence = DiscordPresence(
+            scope = coroutineScope,
+            pausedText = getString(R.string.discord_paused)
+        ).apply { start() }
+
         preferenceUpdaterJob = coroutineScope.launch {
             fun <T : Any> subscribe(
                 prop: SharedPreferencesProperty<T>,
@@ -470,6 +476,7 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
 
             loudnessEnhancer?.release()
             preferenceUpdaterJob?.cancel()
+            discordPresence.release()
 
             coroutineScope.cancel()
             glyphInterface.close()
@@ -783,6 +790,34 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
         }
     }
 
+    private fun maybeUpdateDiscordPresence(events: Player.Events) {
+        if (
+            !events.containsAny(
+                Player.EVENT_MEDIA_ITEM_TRANSITION,
+                Player.EVENT_PLAYBACK_STATE_CHANGED,
+                Player.EVENT_PLAY_WHEN_READY_CHANGED,
+                Player.EVENT_POSITION_DISCONTINUITY,
+                Player.EVENT_PLAYBACK_PARAMETERS_CHANGED,
+                Player.EVENT_TIMELINE_CHANGED,
+                Player.EVENT_MEDIA_METADATA_CHANGED
+            )
+        ) return
+
+        discordPresence.update(
+            player.currentMediaItem
+                ?.takeUnless { player.playbackState == Player.STATE_ENDED }
+                ?.let { mediaItem ->
+                    DiscordPresence.Playback(
+                        mediaItem = mediaItem,
+                        isPlaying = player.shouldBePlaying,
+                        positionMs = player.currentPosition,
+                        durationMs = player.duration.takeIf { it != C.TIME_UNSET },
+                        speed = player.playbackParameters.speed
+                    )
+                }
+        )
+    }
+
     @Suppress("CyclomaticComplexMethod") // TODO: evaluate CyclomaticComplexMethod threshold
     private fun maybeSponsorBlock() {
         poiTimestamp = null
@@ -1016,6 +1051,7 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
         }
 
         updatePlaybackState()
+        maybeUpdateDiscordPresence(events)
 
         if (
             !events.containsAny(

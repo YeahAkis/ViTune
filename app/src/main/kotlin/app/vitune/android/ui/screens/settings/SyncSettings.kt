@@ -34,6 +34,7 @@ import app.vitune.android.Database
 import app.vitune.android.LocalCredentialManager
 import app.vitune.android.R
 import app.vitune.android.models.PipedSession
+import app.vitune.android.preferences.DiscordPreferences
 import app.vitune.android.transaction
 import app.vitune.android.ui.components.themed.CircularProgressIndicator
 import app.vitune.android.ui.components.themed.ConfirmationDialog
@@ -302,5 +303,53 @@ fun SyncSettings(
                 )
             }
         }
+        DiscordSettingsGroup()
+    }
+}
+
+@Composable
+private fun DiscordSettingsGroup() {
+    var loggingIn by remember { mutableStateOf(false) }
+    val isLoggedIn = DiscordPreferences.token.isNotBlank()
+
+    if (loggingIn) DiscordLoginDialog(
+        onDismiss = { loggingIn = false },
+        onToken = {
+            DiscordPreferences.token = it
+            DiscordPreferences.enabled = true
+            loggingIn = false
+        }
+    )
+
+    SettingsGroup(title = stringResource(R.string.discord)) {
+        SettingsDescription(text = stringResource(R.string.discord_warning))
+
+        SettingsEntry(
+            title = if (isLoggedIn) stringResource(R.string.discord_logout)
+            else stringResource(R.string.discord_login),
+            text = if (isLoggedIn) stringResource(R.string.discord_logged_in)
+            else stringResource(R.string.discord_not_logged_in),
+            onClick = {
+                if (isLoggedIn) {
+                    DiscordPreferences.token = ""
+                    DiscordPreferences.enabled = false
+                } else loggingIn = true
+            }
+        )
+        SwitchSettingsEntry(
+            title = stringResource(R.string.discord_presence),
+            text = stringResource(R.string.discord_presence_description),
+            isChecked = DiscordPreferences.enabled,
+            onCheckedChange = { DiscordPreferences.enabled = it },
+            isEnabled = isLoggedIn
+        )
+        EnumValueSelectorSettingsEntry(
+            title = stringResource(R.string.discord_when_paused),
+            text = stringResource(R.string.discord_when_paused_description),
+            selectedValue = DiscordPreferences.pauseBehavior,
+            onValueSelect = { DiscordPreferences.pauseBehavior = it },
+            valueText = { it.displayName() },
+            isEnabled = isLoggedIn
+        )
     }
 }

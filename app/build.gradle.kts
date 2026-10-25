@@ -231,6 +231,7 @@ dependencies {
     implementation(libs.slf4j)
     implementation(libs.logback)
 
+    implementation(projects.providers.discord)
     implementation(projects.providers.github)
     implementation(projects.providers.innertube)
     implementation(projects.providers.kugou)
