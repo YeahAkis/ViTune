@@ -49,7 +49,6 @@
     <string name="enqueue">Masukkan dalam antrian</string>
     <string name="sleep_timer">Pengatur waktu tidur</string>
     <string name="sleep_timer_ended">Waktu tidur berakhir</string>
-    <string name="stop_sleep_timer_prompt">Apakah Anda ingin menghentikan pengatur waktu tidur?</string>
     <string name="equalizer">Pengatur suara</string>
     <string name="set_sleep_timer">Atur pengatur waktu tidur</string>
     <string name="cancel">Batal</string>

@@ -51,7 +51,6 @@
     <string name="sleep_timer">Тајмер за спавање</string>
     <string name="sleep_timer_ended">Тајмер за спавање је истекао</string>
     <string name="sleep_timer_until_song_end">Док песма не заврши</string>
-    <string name="stop_sleep_timer_prompt">Желите ли да зауставите тајмер за спавање?</string>
     <string name="equalizer">Еквилајзер</string>
     <string name="set_sleep_timer">Подеси тајмер за спавање</string>
     <string name="cancel">Откажи</string>

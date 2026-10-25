@@ -50,7 +50,6 @@
     <string name="sleep_timer">Uyku zamanlayıcısı</string>
     <string name="sleep_timer_ended">Uyku zamanlayıcısı sona erdi</string>
     <string name="sleep_timer_until_song_end">Şarkı bitene kadar</string>
-    <string name="stop_sleep_timer_prompt">Uyku zamanlayıcısını durdurmak istiyor musunuz?</string>
     <string name="equalizer">Dengeleyici</string>
     <string name="set_sleep_timer">Uyku zamanlayıcısını ayarlayın</string>
     <string name="cancel">İptal</string>

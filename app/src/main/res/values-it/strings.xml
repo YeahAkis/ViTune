@@ -57,7 +57,6 @@
     <string name="sleep_timer">Timer di spegnimento</string>
     <string name="sleep_timer_ended">Timer di spegnimento terminato</string>
     <string name="sleep_timer_until_song_end">Fino alla fine del brano</string>
-    <string name="stop_sleep_timer_prompt">Vuoi interrompere il timer di spegnimento?</string>
     <string name="equalizer">Equalizzatore</string>
     <string name="set_sleep_timer">Imposta timer di spegnimento</string>
 

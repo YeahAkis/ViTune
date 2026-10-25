@@ -51,7 +51,6 @@
     <string name="sleep_timer">Timer para dormir</string>
     <string name="sleep_timer_ended">Timer para dormir acabou</string>
     <string name="sleep_timer_until_song_end">Até a música acabar</string>
-    <string name="stop_sleep_timer_prompt">Quer parar o timer para dormir?</string>
     <string name="equalizer">Equalizador</string>
     <string name="set_sleep_timer">Preparar timer para dormir</string>
     <string name="cancel">Cancelar</string>

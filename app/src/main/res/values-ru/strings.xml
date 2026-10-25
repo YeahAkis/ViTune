@@ -51,7 +51,6 @@
     <string name="sleep_timer">Таймер сна</string>
     <string name="sleep_timer_ended">Таймер сна завершен</string>
     <string name="sleep_timer_until_song_end">До окончания песни</string>
-    <string name="stop_sleep_timer_prompt">Остановить таймер сна?</string>
     <string name="equalizer">Эквалайзер</string>
     <string name="set_sleep_timer">Установить таймер сна</string>
     <string name="cancel">Отмена</string>

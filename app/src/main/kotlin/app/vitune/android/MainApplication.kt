@@ -72,6 +72,7 @@ import app.vitune.android.service.downloadState
 import app.vitune.android.ui.components.BottomSheetMenu
 import app.vitune.android.ui.components.rememberBottomSheetState
 import app.vitune.android.ui.components.themed.LinearProgressIndicator
+import app.vitune.android.ui.components.themed.SleepTimerDialog
 import app.vitune.android.ui.screens.albumRoute
 import app.vitune.android.ui.screens.artistRoute
 import app.vitune.android.ui.screens.home.HomeScreen
@@ -169,6 +170,8 @@ class MainActivity : ComponentActivity(), MonetColorsChangedListener {
 
     private var _monet: MonetCompat? by mutableStateOf(null)
     val monet get() = _monet ?: throw MonetActivityAccessException()
+
+    private var isShowingSleepTimer by mutableStateOf(false)
 
     override fun onStart() {
         super.onStart()
@@ -339,6 +342,8 @@ class MainActivity : ComponentActivity(), MonetColorsChangedListener {
                     BottomSheetMenu(
                         modifier = Modifier.align(Alignment.BottomCenter)
                     )
+
+                    if (isShowingSleepTimer) SleepTimerDialog(onDismiss = { isShowingSleepTimer = false })
                 }
             }
 
@@ -381,6 +386,8 @@ class MainActivity : ComponentActivity(), MonetColorsChangedListener {
             }
 
             Intent.ACTION_APPLICATION_PREFERENCES -> settingsRoute.ensureGlobal()
+
+            ACTION_SLEEP_TIMER -> isShowingSleepTimer = true
 
             Intent.ACTION_VIEW, Intent.ACTION_SEND -> {
                 val uri = intent.data
@@ -427,6 +434,10 @@ class MainActivity : ComponentActivity(), MonetColorsChangedListener {
         _monet = null
 
         removeOnNewIntentListener(::handleIntent)
+    }
+
+    companion object {
+        const val ACTION_SLEEP_TIMER = "app.vitune.android.action.SLEEP_TIMER"
     }
 
     override fun onStop() {

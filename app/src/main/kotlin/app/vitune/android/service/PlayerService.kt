@@ -20,6 +20,7 @@ import android.media.session.PlaybackState
 import android.net.Uri
 import android.os.Bundle
 import android.os.SystemClock
+import android.widget.RemoteViews
 import android.support.v4.media.session.MediaSessionCompat
 import android.text.format.DateUtils
 import androidx.annotation.OptIn
@@ -250,6 +251,7 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
     private var volumeNormalizationJob: Job? = null
     private var sponsorBlockJob: Job? = null
     private lateinit var discordPresence: DiscordPresence
+    private var isSleepTimerFading = false
 
     override var isInvincibilityEnabled by mutableStateOf(false)
 
@@ -424,6 +426,7 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
             subscribe(PlayerPreferences.volumeNormalizationBaseGainProperty) { maybeNormalizeVolume() }
             subscribe(PlayerPreferences.volumeNormalizationProperty) { maybeNormalizeVolume() }
             subscribe(PlayerPreferences.sponsorBlockEnabledProperty) { maybeSponsorBlock() }
+            subscribe(PlayerPreferences.sleepTimerNotificationProperty) { updateSleepTimerNotification() }
 
             launch {
                 val audioManager = getSystemService<AudioManager>()
@@ -477,6 +480,8 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
             loudnessEnhancer?.release()
             preferenceUpdaterJob?.cancel()
             discordPresence.release()
+            timerJob?.cancel()
+            ServiceNotifications.sleepTimer.cancel(this)
 
             coroutineScope.cancel()
             glyphInterface.close()
@@ -787,6 +792,86 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
                     }
                 }
             }
+        }
+    }
+
+    private fun sleepTimerFadeMillis() =
+        if (PlayerPreferences.sleepTimerFadeOut) PlayerPreferences.sleepTimerFadeSeconds * 1000L else 0L
+
+    private fun applySleepTimerFade(millisLeft: Long) {
+        val window = sleepTimerFadeMillis()
+        if (window <= 0L || millisLeft > window) return restoreSleepTimerVolume()
+
+        val fraction = millisLeft.toFloat() / window
+        player.volume = fraction * fraction
+        isSleepTimerFading = true
+    }
+
+    private fun restoreSleepTimerVolume() {
+        if (!isSleepTimerFading) return
+        isSleepTimerFading = false
+        player.volume = 1f
+    }
+
+    private fun updateSleepTimerNotification(job: TimerJob? = timerJob) {
+        if (job == null || !PlayerPreferences.sleepTimerNotification) {
+            ServiceNotifications.sleepTimer.cancel(this)
+            return
+        }
+
+        val millisLeft = (job.endsAtMillis - System.currentTimeMillis()).coerceAtLeast(0L)
+        val base = SystemClock.elapsedRealtime() + millisLeft
+
+        fun views(layout: Int) = RemoteViews(packageName, layout).apply {
+            setChronometer(
+                R.id.sleep_timer_chronometer,
+                base,
+                getString(R.string.format_sleep_timer_pausing_in),
+                true
+            )
+            setChronometerCountDown(R.id.sleep_timer_chronometer, true)
+        }
+
+        val expanded = views(R.layout.notification_sleep_timer_expanded).apply {
+            listOf(
+                Triple(R.id.sleep_timer_subtract_5, -5, notificationActionReceiver.sleepTimerSubtract5),
+                Triple(R.id.sleep_timer_subtract_1, -1, notificationActionReceiver.sleepTimerSubtract1),
+                Triple(R.id.sleep_timer_add_1, 1, notificationActionReceiver.sleepTimerAdd1),
+                Triple(R.id.sleep_timer_add_5, 5, notificationActionReceiver.sleepTimerAdd5)
+            ).forEach { (id, minutes, action) ->
+                setTextViewText(
+                    id,
+                    if (minutes < 0) getString(R.string.format_sleep_timer_subtract_short, -minutes)
+                    else getString(R.string.format_sleep_timer_add_short, minutes)
+                )
+                setContentDescription(
+                    id,
+                    if (minutes < 0) getString(R.string.format_sleep_timer_subtract_description, -minutes)
+                    else getString(R.string.format_sleep_timer_add_description, minutes)
+                )
+                setOnClickPendingIntent(id, action.pendingIntent)
+            }
+        }
+
+        ServiceNotifications.sleepTimer.sendNotification(this) {
+            this
+                .setSmallIcon(R.drawable.alarm)
+                .setContentTitle(getString(R.string.sleep_timer))
+                .setCustomContentView(views(R.layout.notification_sleep_timer))
+                .setCustomBigContentView(expanded)
+                .setStyle(NotificationCompat.DecoratedCustomViewStyle())
+                .setOngoing(true)
+                .setOnlyAlertOnce(true)
+                .setSilent(true)
+                .setShowWhen(false)
+                .setCategory(NotificationCompat.CATEGORY_STOPWATCH)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setContentIntent(
+                    activityPendingIntent<MainActivity>(
+                        requestCode = SLEEP_TIMER_REQUEST_CODE,
+                        flags = PendingIntent.FLAG_UPDATE_CURRENT
+                    ) { action = MainActivity.ACTION_SLEEP_TIMER }
+                )
         }
     }
 
@@ -1273,8 +1358,16 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
         @kotlin.OptIn(FlowPreview::class)
         fun startSleepTimer(delayMillis: Long) {
             timerJob?.cancel()
+            restoreSleepTimerVolume()
 
-            timerJob = coroutineScope.timer(delayMillis) {
+            timerJob = coroutineScope.timer(
+                delayMillis = delayMillis,
+                minMillisLeft = SLEEP_TIMER_MIN_MILLIS,
+                maxMillisLeft = SLEEP_TIMER_MAX_MILLIS,
+                fastTickWindowMillis = ::sleepTimerFadeMillis,
+                onChange = { job -> handler.post { updateSleepTimerNotification(job) } },
+                onTick = { millisLeft -> handler.post { applySleepTimerFade(millisLeft) } }
+            ) {
                 ServiceNotifications.sleepTimer.sendNotification(this@PlayerService) {
                     this
                         .setContentTitle(getString(R.string.sleep_timer_ended))
@@ -1286,8 +1379,9 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
                 }
 
                 handler.post {
+                    timerJob = null
                     player.pause()
-                    // player.stop()
+                    restoreSleepTimerVolume()
 
                     glyphInterface.glyph {
                         turnOff()
@@ -1299,14 +1393,24 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
                         .millisLeft
                         .takeWhile { it != null }
                         .debounce(500.milliseconds)
-                        .map { ((it ?: 0L) / delayMillis.toFloat() * 100).toInt() }
+                        .map { ((it ?: 0L) / job.totalMillis.toFloat() * 100).toInt() }
                 )
             }
+        }
+
+        fun startSleepTimerUntilSongEnd() = runCatching {
+            startSleepTimer(player.duration - player.contentPosition)
+        }
+
+        fun addToSleepTimer(millis: Long) {
+            timerJob?.add(millis)
         }
 
         fun cancelSleepTimer() {
             timerJob?.cancel()
             timerJob = null
+            restoreSleepTimerVolume()
+            ServiceNotifications.sleepTimer.cancel(this@PlayerService)
         }
 
         fun setupRadio(endpoint: NavigationEndpoint.Endpoint.Watch?) =
@@ -1443,6 +1547,10 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
         val loop by action { _, _ ->
             loopAction()
         }
+        val sleepTimerSubtract5 by action { _, _ -> binder.addToSleepTimer(-5 * MINUTE_MILLIS) }
+        val sleepTimerSubtract1 by action { _, _ -> binder.addToSleepTimer(-MINUTE_MILLIS) }
+        val sleepTimerAdd1 by action { _, _ -> binder.addToSleepTimer(MINUTE_MILLIS) }
+        val sleepTimerAdd5 by action { _, _ -> binder.addToSleepTimer(5 * MINUTE_MILLIS) }
     }
 
     class NotificationDismissReceiver : BroadcastReceiver() {
@@ -1458,6 +1566,10 @@ class PlayerService : InvincibleService(), Player.Listener, PlaybackStatsListene
         private const val PRECACHE_HEAD_LENGTH = 512 * 1024L
         private const val BUFFER_FOR_PLAYBACK_MS = 1_000
         private const val EXPIRY_MARGIN_MS = 60_000L
+        private const val MINUTE_MILLIS = 60_000L
+        const val SLEEP_TIMER_MIN_MILLIS = MINUTE_MILLIS
+        const val SLEEP_TIMER_MAX_MILLIS = 10 * 60 * MINUTE_MILLIS
+        private const val SLEEP_TIMER_REQUEST_CODE = 1
         private const val PREFETCH_LOOKAHEAD = 5
 
         fun createDatabaseProvider(context: Context) = StandaloneDatabaseProvider(context)

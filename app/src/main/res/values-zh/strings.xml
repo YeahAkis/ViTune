@@ -51,7 +51,6 @@
     <string name="sleep_timer">睡眠定时器</string>
     <string name="sleep_timer_ended">睡眠定时器结束</string>
     <string name="sleep_timer_until_song_end">直到歌曲结束</string>
-    <string name="stop_sleep_timer_prompt">您要停止睡眠定时器吗？</string>
     <string name="equalizer">均衡器</string>
     <string name="set_sleep_timer">设置睡眠定时器</string>
     <string name="cancel">取消</string>

@@ -58,6 +58,12 @@ object PlayerPreferences : GlobalPreferencesHolder() {
 
     var pauseCache by boolean(false)
 
+    val sleepTimerNotificationProperty = boolean(true)
+    var sleepTimerNotification by sleepTimerNotificationProperty
+    var sleepTimerFadeOut by boolean(true)
+    var sleepTimerFadeSeconds by int(30)
+    var sleepTimerLastMinutes by int(30)
+
     val sponsorBlockEnabledProperty = boolean(false)
     var sponsorBlockEnabled by sponsorBlockEnabledProperty
 

@@ -50,7 +50,6 @@
     <string name="sleep_timer">スリープタイマー</string>
     <string name="sleep_timer_ended">スリープタイマーが終了しました</string>
     <string name="sleep_timer_until_song_end">曲が終わるまで</string>
-    <string name="stop_sleep_timer_prompt">スリープタイマーを停止しますか？</string>
     <string name="equalizer">イコライザー</string>
     <string name="set_sleep_timer">スリープタイマーを設定する</string>
     <string name="cancel">キャンセル</string>

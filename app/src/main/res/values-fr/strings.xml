@@ -51,7 +51,6 @@
     <string name="sleep_timer">Minuterie de sommeil</string>
     <string name="sleep_timer_ended">Minuterie de sommeil terminée</string>
     <string name="sleep_timer_until_song_end">Jusqu\'à la fin de la chanson</string>
-    <string name="stop_sleep_timer_prompt">Voulez-vous arrêter la minuterie de sommeil ?</string>
     <string name="equalizer">Égaliseur</string>
     <string name="set_sleep_timer">Régler la minuterie de sommeil</string>
     <string name="cancel">Annuler</string>

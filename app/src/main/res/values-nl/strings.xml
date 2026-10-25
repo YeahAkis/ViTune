@@ -51,7 +51,6 @@
     <string name="sleep_timer">Slaaptimer</string>
     <string name="sleep_timer_ended">Slaaptimer voorbij</string>
     <string name="sleep_timer_until_song_end">Totdat het nummer eindigt</string>
-    <string name="stop_sleep_timer_prompt">Wil je de timer stoppen?</string>
     <string name="equalizer">Equalizer</string>
     <string name="set_sleep_timer">Slaaptimer instellen</string>
     <string name="cancel">Annuleer</string>

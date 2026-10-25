@@ -26,6 +26,11 @@ import app.vitune.android.ui.components.themed.SecondaryTextButton
 import app.vitune.android.ui.screens.Route
 import app.vitune.android.utils.rememberEqualizerLauncher
 import app.vitune.core.ui.utils.isAtLeastAndroid6
+import kotlin.math.roundToInt
+
+private const val FADE_MIN_SECONDS = 5
+private const val FADE_MAX_SECONDS = 120
+private const val FADE_STEP_SECONDS = 5
 
 @OptIn(UnstableApi::class)
 @Route
@@ -73,6 +78,34 @@ fun PlayerSettings() = with(PlayerPreferences) {
                 isChecked = skipOnError,
                 onCheckedChange = { skipOnError = it }
             )
+        }
+        SettingsGroup(title = stringResource(R.string.sleep_timer)) {
+            SwitchSettingsEntry(
+                title = stringResource(R.string.sleep_timer_notification),
+                text = stringResource(R.string.sleep_timer_notification_description),
+                isChecked = sleepTimerNotification,
+                onCheckedChange = { sleepTimerNotification = it }
+            )
+            SwitchSettingsEntry(
+                title = stringResource(R.string.sleep_timer_fade_out),
+                text = stringResource(R.string.sleep_timer_fade_out_description),
+                isChecked = sleepTimerFadeOut,
+                onCheckedChange = { sleepTimerFadeOut = it }
+            )
+            AnimatedVisibility(visible = sleepTimerFadeOut) {
+                var fadeSeconds by remember { mutableFloatStateOf(sleepTimerFadeSeconds.toFloat()) }
+
+                SliderSettingsEntry(
+                    title = stringResource(R.string.sleep_timer_fade_duration),
+                    text = stringResource(R.string.sleep_timer_fade_duration_description),
+                    state = fadeSeconds,
+                    onSlide = { fadeSeconds = it },
+                    onSlideComplete = { sleepTimerFadeSeconds = fadeSeconds.roundToInt() },
+                    toDisplay = { stringResource(R.string.format_seconds, it.roundToInt()) },
+                    range = FADE_MIN_SECONDS.toFloat()..FADE_MAX_SECONDS.toFloat(),
+                    steps = (FADE_MAX_SECONDS - FADE_MIN_SECONDS) / FADE_STEP_SECONDS - 1
+                )
+            }
         }
         SettingsGroup(title = stringResource(R.string.audio)) {
             AnimatedVisibility(visible = changed) {

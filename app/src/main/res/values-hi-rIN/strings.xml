@@ -51,7 +51,6 @@
     <string name="sleep_timer">स्लीप टाइमर</string>
     <string name="sleep_timer_ended">स्लीप टाइमर समाप्त</string>
     <string name="sleep_timer_until_song_end">गाना ख़त्म होने तक</string>
-    <string name="stop_sleep_timer_prompt">क्या आप स्लीप टाइमर को रोकना चाहते हैं?</string>
     <string name="equalizer">इक्वलाइज़र</string>
     <string name="set_sleep_timer">स्लीप टाइमर सेट करें</string>
     <string name="cancel">रद्द करें</string>

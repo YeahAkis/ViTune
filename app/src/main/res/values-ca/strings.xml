@@ -51,7 +51,6 @@
     <string name="sleep_timer">Temporitzador</string>
     <string name="sleep_timer_ended">Temporitzador finalitzat</string>
     <string name="sleep_timer_until_song_end">Fins al final de la cançó</string>
-    <string name="stop_sleep_timer_prompt">Voleu aturar el temporitzador?</string>
     <string name="equalizer">Equalitzador</string>
     <string name="set_sleep_timer">Configurar temporitzador</string>
     <string name="cancel">Cancella</string>

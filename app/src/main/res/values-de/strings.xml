@@ -51,7 +51,6 @@
     <string name="sleep_timer">Schlaf-Timer</string>
     <string name="sleep_timer_ended">Schlaf-Timer beendet</string>
     <string name="sleep_timer_until_song_end">Bis Liedende</string>
-    <string name="stop_sleep_timer_prompt">Möchten Sie den Schlaf-Timer anhalten?</string>
     <string name="equalizer">Equalizer</string>
     <string name="set_sleep_timer">Schlaf-Timer einstellen</string>
     <string name="cancel">Abbrechen</string>
