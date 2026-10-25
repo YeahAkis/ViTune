@@ -344,5 +344,33 @@ private fun DiscordSettingsGroup() {
             valueText = { it.displayName() },
             isEnabled = isLoggedIn
         )
+        SwitchSettingsEntry(
+            title = stringResource(R.string.discord_show_artist),
+            text = null,
+            isChecked = DiscordPreferences.showArtist,
+            onCheckedChange = { DiscordPreferences.showArtist = it },
+            isEnabled = isLoggedIn
+        )
+        SwitchSettingsEntry(
+            title = stringResource(R.string.discord_show_artwork),
+            text = null,
+            isChecked = DiscordPreferences.showArtwork,
+            onCheckedChange = { DiscordPreferences.showArtwork = it },
+            isEnabled = isLoggedIn
+        )
+        SwitchSettingsEntry(
+            title = stringResource(R.string.discord_show_album),
+            text = stringResource(R.string.discord_show_album_description),
+            isChecked = DiscordPreferences.showAlbum,
+            onCheckedChange = { DiscordPreferences.showAlbum = it },
+            isEnabled = isLoggedIn && DiscordPreferences.showArtwork
+        )
+        SwitchSettingsEntry(
+            title = stringResource(R.string.discord_show_progress),
+            text = stringResource(R.string.discord_show_progress_description),
+            isChecked = DiscordPreferences.showProgress,
+            onCheckedChange = { DiscordPreferences.showProgress = it },
+            isEnabled = isLoggedIn
+        )
     }
 }

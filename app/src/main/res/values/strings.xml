@@ -227,6 +227,12 @@
     <string name="discord_pause_clear">Clear status</string>
     <string name="discord_pause_show_paused">Show as paused</string>
     <string name="discord_paused">Paused</string>
+    <string name="discord_show_artist">Show artist</string>
+    <string name="discord_show_artwork">Show album art</string>
+    <string name="discord_show_album">Show album</string>
+    <string name="discord_show_album_description">Shown when hovering the album art</string>
+    <string name="discord_show_progress">Show progress</string>
+    <string name="discord_show_progress_description">Shows elapsed and remaining time</string>
     <string name="song_quality">Song quality</string>
     <string name="song_quality_description">Save storage plays and caches lower bitrate Opus streams, roughly half the size. Songs already cached keep their quality</string>
     <string name="song_quality_best">Best</string>

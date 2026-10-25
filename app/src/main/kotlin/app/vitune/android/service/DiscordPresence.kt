@@ -31,6 +31,19 @@ class DiscordPresence(
         val speed: Float
     )
 
+    private data class Options(
+        val showArtist: Boolean,
+        val showAlbum: Boolean,
+        val showArtwork: Boolean,
+        val showProgress: Boolean
+    )
+
+    private data class Settings(
+        val token: String?,
+        val pauseBehavior: PauseBehavior,
+        val options: Options
+    )
+
     private val playback = MutableStateFlow<Playback?>(null)
     private val images = LruCache<String, String>(IMAGE_CACHE_SIZE)
 
@@ -46,16 +59,30 @@ class DiscordPresence(
     fun start() {
         if (job?.isActive == true) return
 
+        val options = combine(
+            DiscordPreferences.showArtistProperty.stateFlow,
+            DiscordPreferences.showAlbumProperty.stateFlow,
+            DiscordPreferences.showArtworkProperty.stateFlow,
+            DiscordPreferences.showProgressProperty.stateFlow,
+            ::Options
+        )
+
+        val settings = combine(
+            DiscordPreferences.enabledProperty.stateFlow,
+            DiscordPreferences.tokenProperty.stateFlow,
+            DiscordPreferences.pauseBehaviorProperty.stateFlow,
+            options
+        ) { enabled, token, pauseBehavior, options ->
+            Settings(
+                token = token.takeIf { enabled && it.isNotBlank() },
+                pauseBehavior = pauseBehavior,
+                options = options
+            )
+        }
+
         job = scope.launch {
-            combine(
-                playback,
-                DiscordPreferences.enabledProperty.stateFlow,
-                DiscordPreferences.tokenProperty.stateFlow,
-                DiscordPreferences.pauseBehaviorProperty.stateFlow
-            ) { playback, enabled, token, pauseBehavior ->
-                Triple(playback, token.takeIf { enabled && it.isNotBlank() }, pauseBehavior)
-            }.collectLatest { (playback, token, pauseBehavior) ->
-                render(playback, token, pauseBehavior)
+            combine(playback, settings, ::Pair).collectLatest { (playback, settings) ->
+                render(playback, settings)
             }
         }
     }
@@ -66,13 +93,14 @@ class DiscordPresence(
         stopGateway()
     }
 
-    private suspend fun render(playback: Playback?, token: String?, pauseBehavior: PauseBehavior) {
+    private suspend fun render(playback: Playback?, settings: Settings) {
+        val token = settings.token
         if (token == null) {
             stopGateway()
             return
         }
 
-        val shown = playback?.takeIf { it.isPlaying || pauseBehavior == PauseBehavior.ShowPaused }
+        val shown = playback?.takeIf { it.isPlaying || settings.pauseBehavior == PauseBehavior.ShowPaused }
         if (shown == null) {
             if (lastActivity != null) {
                 gateway?.setActivity(null)
@@ -85,7 +113,7 @@ class DiscordPresence(
 
         delay(UPDATE_DEBOUNCE)
 
-        val activity = activityOf(shown, token)
+        val activity = activityOf(shown, token, settings.options)
         if (lastActivity?.isSameAs(activity) == true && gateway?.isRunning == true) return
 
         gatewayFor(token).apply {
@@ -116,12 +144,14 @@ class DiscordPresence(
         lastActivity = null
     }
 
-    private suspend fun activityOf(playback: Playback, token: String): Activity {
+    private suspend fun activityOf(playback: Playback, token: String, options: Options): Activity {
         val metadata = playback.mediaItem.mediaMetadata
         val title = metadata.title?.toString()
-        val artist = metadata.artist?.toString()
+        val artist = metadata.artist?.toString()?.takeIf { options.showArtist }
+        val album = metadata.albumTitle?.toString()?.takeIf { options.showAlbum }
+        val image = if (options.showArtwork) image(metadata.artworkUri?.toString(), token) else null
 
-        val timestamps = if (playback.isPlaying) {
+        val timestamps = if (playback.isPlaying && options.showProgress) {
             val now = System.currentTimeMillis()
             val speed = playback.speed.coerceAtLeast(MIN_SPEED)
             Activity.Timestamps(
@@ -137,10 +167,7 @@ class DiscordPresence(
             details = title,
             state = if (playback.isPlaying) artist else listOfNotNull(pausedText, artist).joinToString(" · "),
             timestamps = timestamps,
-            assets = Activity.Assets(
-                largeImage = image(metadata.artworkUri?.toString(), token),
-                largeText = metadata.albumTitle?.toString() ?: title
-            )
+            assets = image?.let { Activity.Assets(largeImage = it, largeText = album) }
         )
     }
 

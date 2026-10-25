@@ -13,6 +13,14 @@ object DiscordPreferences : PreferencesHolder(Dependencies.application, "discord
     var token by tokenProperty
     val pauseBehaviorProperty = enum(PauseBehavior.Clear)
     var pauseBehavior by pauseBehaviorProperty
+    val showArtistProperty = boolean(true)
+    var showArtist by showArtistProperty
+    val showAlbumProperty = boolean(false)
+    var showAlbum by showAlbumProperty
+    val showArtworkProperty = boolean(true)
+    var showArtwork by showArtworkProperty
+    val showProgressProperty = boolean(true)
+    var showProgress by showProgressProperty
 
     enum class PauseBehavior(val displayName: @Composable () -> String) {
         Clear(displayName = { stringResource(R.string.discord_pause_clear) }),
